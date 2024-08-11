@@ -22,7 +22,7 @@ const ISOToLanguage = {
     "tr": "Turkish"
 };
 
-const apiKey = 'sk-zxcqqFnSQPWTEaDuB4FoStpw4dT2IFyHj4vcbzezh0T3BlbkFJ9JLiYWus8qrxjFMP39C7uOeP5kK9OsXbMy5VXMEbYA'; // Replace with your actual OpenAI API key
+const apiKey = ''; // We'll remove this later
 
 document.addEventListener('DOMContentLoaded', function() {
     startButton = document.getElementById('startButton');
@@ -144,18 +144,19 @@ function stopConversation() {
 }
 
 async function transcribeAudio(audioBlob) {
-    const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.wav');
-    formData.append('model', 'whisper-1');
-    formData.append('response_format', 'json');
-
     try {
-        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        // Convert audioBlob to base64
+        const base64Audio = await blobToBase64(audioBlob);
+
+        const response = await fetch('/.netlify/functions/openai-api', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`
+                'Content-Type': 'application/json',
             },
-            body: formData
+            body: JSON.stringify({
+                action: 'transcribe',
+                data: base64Audio
+            })
         });
 
         if (!response.ok) {
@@ -175,28 +176,40 @@ async function transcribeAudio(audioBlob) {
     }
 }
 
-async function detectLanguage(text) {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'gpt-4',
-            messages: [
-                { role: 'system', content: 'You are a language detection tool. Respond only with the ISO 639-1 code of the language of the given text.' },
-                { role: 'user', content: text }
-            ]
-        })
+// Helper function to convert Blob to base64
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
     });
+}
 
-    if (!response.ok) {
-        throw new Error(`Language detection failed: ${response.statusText}`);
+async function detectLanguage(text) {
+    try {
+        const response = await fetch('/.netlify/functions/openai-api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'detectLanguage',
+                data: text
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Language detection failed: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.detectedLanguage;
+    } catch (error) {
+        console.error('Language detection error:', error);
+        updateStatus(`Language detection error: ${error.message}`);
+        throw error;
     }
-
-    const data = await response.json();
-    return data.choices[0].message.content.trim().toLowerCase();
 }
 
 async function processAudio(audioBlob, language1, language2) {
@@ -225,79 +238,94 @@ async function processAudio(audioBlob, language1, language2) {
 }
 
 async function translateText(text, sourceLanguage, targetLanguage) {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'gpt-4',
-            messages: [
-                { role: 'system', content: `You are a professional translator. Translate the following text from ${ISOToLanguage[sourceLanguage] || sourceLanguage} to ${ISOToLanguage[targetLanguage]}. Translate only the provided text, do not add any additional content or commentary.` },
-                { role: 'user', content: text }
-            ]
-        })
-    });
+    try {
+        const response = await fetch('/.netlify/functions/openai-api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'translate',
+                data: {
+                    text: text,
+                    sourceLanguage: ISOToLanguage[sourceLanguage] || sourceLanguage,
+                    targetLanguage: ISOToLanguage[targetLanguage]
+                }
+            })
+        });
 
-    if (!response.ok) {
-        throw new Error(`Translation failed: ${response.statusText}`);
+        if (!response.ok) {
+            throw new Error(`Translation failed: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        let translatedText = data.translatedText;
+
+        // Double-check the translation
+        const doubleCheckResponse = await fetch('/.netlify/functions/openai-api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'validateTranslation',
+                data: {
+                    originalText: text,
+                    translatedText: translatedText,
+                    sourceLanguage: ISOToLanguage[sourceLanguage] || sourceLanguage,
+                    targetLanguage: ISOToLanguage[targetLanguage]
+                }
+            })
+        });
+
+        if (!doubleCheckResponse.ok) {
+            throw new Error(`Translation validation failed: ${doubleCheckResponse.status} ${doubleCheckResponse.statusText}`);
+        }
+
+        const doubleCheckData = await doubleCheckResponse.json();
+        translatedText = doubleCheckData.validatedTranslation;
+
+        updateStatus(`Translated: ${translatedText}`);
+        return translatedText;
+    } catch (error) {
+        console.error('Translation error:', error);
+        updateStatus(`Translation error: ${error.message}`);
+        throw error;
     }
-
-   const data = await response.json();
-    let translatedText = data.choices[0].message.content;
-
-    // Double-check the translation
-    const doubleCheckResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'gpt-4',
-            messages: [
-                { role: 'system', content: `You are a translation validator. Compare the original text and its translation. If the translation contains any additional content not present in the original, remove it. Only return the corrected translation.` },
-                { role: 'user', content: `Original (${ISOToLanguage[sourceLanguage] || sourceLanguage}): ${text}\nTranslation (${ISOToLanguage[targetLanguage]}): ${translatedText}` }
-            ]
-        })
-    });
-
-    if (!doubleCheckResponse.ok) {
-        throw new Error(`Translation validation failed: ${doubleCheckResponse.statusText}`);
-    }
-
-    const doubleCheckData = await doubleCheckResponse.json();
-    translatedText = doubleCheckData.choices[0].message.content;
-
-    updateStatus(`Translated: ${translatedText}`);
-    return translatedText;
 }
-
 async function generateSpeech(text, language) {
-    const response = await fetch('https://api.openai.com/v1/audio/speech', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'tts-1',
-            input: text,
-            voice: 'alloy', // You can change this to other available voices
-            language: language
-        })
-    });
+    try {
+        const response = await fetch('/.netlify/functions/openai-api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'generateSpeech',
+                data: {
+                    text: text,
+                    language: language,
+                    voice: 'alloy' // You can still specify the voice here if needed
+                }
+            })
+        });
 
-    if (!response.ok) {
-        throw new Error(`Speech generation failed: ${response.statusText}`);
+        if (!response.ok) {
+            throw new Error(`Speech generation failed: ${response.status} ${response.statusText}`);
+        }
+
+        // The response should be the audio data
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        audio.play();
+
+        updateStatus(`Speech generated and playing`);
+    } catch (error) {
+        console.error('Speech generation error:', error);
+        updateStatus(`Speech generation error: ${error.message}`);
+        throw error;
     }
-
-    const audioBlob = await response.blob();
-    const audioUrl = URL.createObjectURL(audioBlob);
-    const audio = new Audio(audioUrl);
-    audio.play();
-    
 }
 
 function updateStatus(message) {
