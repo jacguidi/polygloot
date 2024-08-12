@@ -305,7 +305,7 @@ async function generateSpeech(text, language) {
                 data: {
                     text: text,
                     language: language,
-                    voice: 'alloy' // You can still specify the voice here if needed
+                    voice: 'alloy'
                 }
             })
         });
@@ -314,18 +314,34 @@ async function generateSpeech(text, language) {
             throw new Error(`Speech generation failed: ${response.status} ${response.statusText}`);
         }
 
-        // The response should be the audio data
-        const audioBlob = await response.blob();
+        const data = await response.json();
+        console.log('Received audio data:', data.audio.substring(0, 100) + '...');
+
+        if (!data.audio) {
+            throw new Error('No audio data received from the server');
+        }
+
+        const audioBlob = base64ToBlob(data.audio, 'audio/mpeg');
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
-        audio.play();
+        await audio.play();
 
         updateStatus(`Speech generated and playing`);
     } catch (error) {
         console.error('Speech generation error:', error);
         updateStatus(`Speech generation error: ${error.message}`);
-        throw error;
     }
+}
+
+// Add this helper function to convert base64 to Blob
+function base64ToBlob(base64, mimeType) {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
 }
 
 function updateStatus(message) {
