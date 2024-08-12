@@ -12,14 +12,16 @@ const languageToISO = {
     "English": "en",
     "Italian": "it",
     "French": "fr",
-    "Turkish": "tr"
+    "Turkish": "tr",
+    "Spanish": "es"  
 };
 
 const ISOToLanguage = {
     "en": "English",
     "it": "Italian",
     "fr": "French",
-    "tr": "Turkish"
+    "tr": "Turkish",
+    "es": "Spanish"  
 };
 
 const apiKey = ''; // We'll remove this later
