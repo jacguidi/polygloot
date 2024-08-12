@@ -156,5 +156,6 @@ async function generateSpeech(text, language, voice) {
   }
 
   const audioBuffer = await response.arrayBuffer();
-  return { audio: Buffer.from(audioBuffer).toString('base64') };
+  const base64Audio = Buffer.from(audioBuffer).toString('base64');
+  return { audio: base64Audio };
 }
