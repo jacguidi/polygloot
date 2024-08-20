@@ -171,17 +171,16 @@ function stopConversation() {
 async function processAudio(audioBlob, language1, language2) {
     try {
         let transcribedText = await transcribeAudio(audioBlob);
-        let detectedLanguage = await detectLanguage(transcribedText);
+        let detectedLanguage = await detectLanguage(transcribedText.text);
 
         console.log(`Detected language: ${detectedLanguage}, Language1: ${language1}, Language2: ${language2}`);
 
         if (detectedLanguage !== language1 && detectedLanguage !== language2) {
             updateStatus('Warning: Detected language does not match either of the selected languages. Proceeding with transcription.');
-            // Optionally, allow the user to proceed or manually select a language
         }
 
         let targetLanguage = (detectedLanguage === language1) ? language2 : language1;
-        const translatedText = await translateText(transcribedText, detectedLanguage, targetLanguage);
+        const translatedText = await translateText(transcribedText.text, detectedLanguage, targetLanguage);
         await generateSpeech(translatedText, targetLanguage);
 
     } catch (error) {
