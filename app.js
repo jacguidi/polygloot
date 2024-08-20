@@ -28,7 +28,6 @@ const ISOToLanguage = {
     "es": "Spanish"
 };
 
-const apiKey = '.'; // Ensure this is set properly in your environment
 
 document.addEventListener('DOMContentLoaded', function() {
     startButton = document.getElementById('startButton');
