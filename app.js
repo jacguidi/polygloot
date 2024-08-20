@@ -170,7 +170,15 @@ function stopConversation() {
 
 async function processAudio(audioBlob, language1, language2) {
     try {
-        let transcribedText = await transcribeAudio(audioBlob);
+        // Convert the audioBlob to base64
+        const base64Audio = await blobToBase64(audioBlob);
+
+        // Log the type and content of base64Audio
+        console.log("Type of base64Audio:", typeof base64Audio);
+        console.log("Content of base64Audio:", base64Audio);
+
+        // Transcribe the audio
+        let transcribedText = await transcribeAudio(base64Audio);
         let detectedLanguage = await detectLanguage(transcribedText.text);
 
         console.log(`Detected language: ${detectedLanguage}, Language1: ${language1}, Language2: ${language2}`);
@@ -189,8 +197,7 @@ async function processAudio(audioBlob, language1, language2) {
 }
 
 async function transcribeAudio(base64Audio) {
-    // Sanitize the base64 string
-    base64Audio = base64Audio.replace(/[^A-Za-z0-9+/=]/g, '');
+    // Assuming base64Audio is already correctly formatted
 
     try {
         const byteCharacters = atob(base64Audio);
