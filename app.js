@@ -196,28 +196,17 @@ async function processAudio(audioBlob, language1, language2) {
 }
 
 async function transcribeAudio(base64Audio) {
-    // Assuming base64Audio is already correctly formatted
-
     try {
-        const byteCharacters = atob(base64Audio);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const audioBlob = new Blob([byteArray], { type: 'audio/wav' });
-
-        const formData = new FormData();
-        formData.append('file', audioBlob, 'audio.wav');
-        formData.append('model', 'whisper-1');
-        formData.append('response_format', 'json');
-
-        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        // Make a request to the Netlify serverless function to handle the transcription
+        const response = await fetch('/.netlify/functions/openai-api', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`
+                'Content-Type': 'application/json',
             },
-            body: formData
+            body: JSON.stringify({
+                action: 'transcribe',
+                data: base64Audio
+            })
         });
 
         if (!response.ok) {
