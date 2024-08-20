@@ -28,7 +28,7 @@ const ISOToLanguage = {
     "es": "Spanish"
 };
 
-const apiKey = ''; // Ensure this is set properly in your environment
+const apiKey = 'sk-zxcqqFnSQPWTEaDuB4FoStpw4dT2IFyHj4vcbzezh0T3BlbkFJ9JLiYWus8qrxjFMP39C7uOeP5kK9OsXbMy5VXMEbYA'; // Ensure this is set properly in your environment
 
 document.addEventListener('DOMContentLoaded', function() {
     startButton = document.getElementById('startButton');
