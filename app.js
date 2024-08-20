@@ -190,9 +190,16 @@ async function processAudio(audioBlob, language1, language2) {
 }
 
 async function transcribeAudio(base64Audio) {
+    const byteCharacters = atob(base64Audio);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const audioBlob = new Blob([byteArray], { type: 'audio/wav' });
+
     const formData = new FormData();
-    const buffer = Buffer.from(base64Audio, 'base64');
-    formData.append('file', buffer, { filename: 'audio.wav' });
+    formData.append('file', audioBlob, 'audio.wav');
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'json');
 
@@ -200,8 +207,7 @@ async function transcribeAudio(base64Audio) {
         const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                ...formData.getHeaders()
+                'Authorization': `Bearer ${apiKey}`
             },
             body: formData
         });
@@ -219,6 +225,7 @@ async function transcribeAudio(base64Audio) {
         throw error;
     }
 }
+
 
 // Helper function to convert Blob to base64
 function blobToBase64(blob) {
