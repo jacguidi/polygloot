@@ -7,13 +7,17 @@ let mediaRecorder;
 let audioChunks = [];
 let speechEvents;
 let stream;
+let continuousRecorder;
+let preBuffer = [];
+let preBufferDuration = 2000; // 2 seconds buffer
+let preBufferSize = preBufferDuration / 100; // Calculate buffer size
 
 const languageToISO = {
     "English": "en",
     "Italian": "it",
     "French": "fr",
     "Turkish": "tr",
-    "Spanish": "es"  
+    "Spanish": "es"
 };
 
 const ISOToLanguage = {
@@ -21,7 +25,7 @@ const ISOToLanguage = {
     "it": "Italian",
     "fr": "French",
     "tr": "Turkish",
-    "es": "Spanish"  
+    "es": "Spanish"
 };
 
 const apiKey = ''; // We'll remove this later
@@ -65,11 +69,11 @@ async function startConversation() {
     }
 
     if (transcribedTextElement) {
-        transcribedTextElement.textContent = ''; 
+        transcribedTextElement.textContent = '';
     }
     const language1 = languageToISO[language1Select.options[language1Select.selectedIndex].text];
     const language2 = languageToISO[language2Select.options[language2Select.selectedIndex].text];
-    
+
     try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const options = {
@@ -77,12 +81,25 @@ async function startConversation() {
             interval: 50
         };
         speechEvents = hark(stream, options);
-        
+
+        // Create a continuous recording stream for pre-buffering
+        continuousRecorder = new MediaRecorder(stream);
+        continuousRecorder.ondataavailable = (event) => {
+            preBuffer.push(event.data);
+            if (preBuffer.length > preBufferSize) {
+                preBuffer.shift(); // Keep the buffer at the desired size
+            }
+        };
+        continuousRecorder.start(100); // Capture every 100ms
+
         let isRecording = false;
 
         speechEvents.on('speaking', function() {
             if (!isRecording) {
+                // Start a new recording and include the pre-buffered audio
                 mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [...preBuffer]; // Start with pre-buffered audio
+
                 mediaRecorder.ondataavailable = (event) => {
                     audioChunks.push(event.data);
                 };
@@ -91,7 +108,6 @@ async function startConversation() {
                     await processAudio(audioBlob, language1, language2);
                 };
                 mediaRecorder.start();
-                audioChunks = [];
                 isRecording = true;
                 updateStatus('Speaking detected, recording started');
             }
@@ -105,7 +121,7 @@ async function startConversation() {
                         isRecording = false;
                         updateStatus('Speech pause detected, processing audio');
                     }
-                }, 1500);
+                }, 2000); // Adjusted timeout to 2 seconds
             }
         });
 
@@ -122,27 +138,63 @@ function stopConversation() {
     if (mediaRecorder) {
         mediaRecorder.stop();
     }
-    
+
+    // Stop the continuous recorder if it exists
+    if (continuousRecorder) {
+        continuousRecorder.stop();
+    }
+
     // Stop the speech events if they exist
     if (speechEvents) {
         speechEvents.stop();
     }
-    
+
     // Stop all tracks in the audio stream if it exists
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
     }
-    
+
     // Reset all variables
     mediaRecorder = null;
+    continuousRecorder = null;
     speechEvents = null;
     stream = null;
     audioChunks = [];
-    
+    preBuffer = [];
+
     // Update status and button
     updateStatus('Conversation stopped');
     startButton.textContent = 'Start Conversation';
     startButton.onclick = startConversation;
+}
+
+async function processAudio(audioBlob, language1, language2) {
+    try {
+        // Transcribe the audio without assuming a specific language
+        let transcribedText = await transcribeAudio(audioBlob);
+        
+        // Immediately detect the language of the transcription
+        let detectedLanguage = await detectLanguage(transcribedText);
+
+        console.log(`Detected language: ${detectedLanguage}, Language1: ${language1}, Language2: ${language2}`);
+
+        // Ensure that the detected language is either language1 or language2
+        if (detectedLanguage !== language1 && detectedLanguage !== language2) {
+            throw new Error('Detected language does not match either of the selected languages');
+        }
+
+        // Always translate to the other language, regardless of which was detected
+        let targetLanguage = (detectedLanguage === language1) ? language2 : language1;
+
+        console.log(`Source language: ${detectedLanguage}, Target language: ${targetLanguage}`);
+
+        // Always perform the translation
+        const translatedText = await translateText(transcribedText, detectedLanguage, targetLanguage);
+        await generateSpeech(translatedText, targetLanguage);
+
+    } catch (error) {
+        updateStatus(`Error processing audio: ${error.message}`);
+    }
 }
 
 async function transcribeAudio(audioBlob) {
@@ -214,35 +266,6 @@ async function detectLanguage(text) {
     }
 }
 
-async function processAudio(audioBlob, language1, language2) {
-    try {
-        // Transcribe the audio without assuming a specific language
-        let transcribedText = await transcribeAudio(audioBlob);
-        
-        // Immediately detect the language of the transcription
-        let detectedLanguage = await detectLanguage(transcribedText);
-
-        console.log(`Detected language: ${detectedLanguage}, Language1: ${language1}, Language2: ${language2}`);
-
-        // Ensure that the detected language is either language1 or language2
-        if (detectedLanguage !== language1 && detectedLanguage !== language2) {
-            throw new Error('Detected language does not match either of the selected languages');
-        }
-
-        // Always translate to the other language, regardless of which was detected
-        let targetLanguage = (detectedLanguage === language1) ? language2 : language1;
-
-        console.log(`Source language: ${detectedLanguage}, Target language: ${targetLanguage}`);
-
-        // Always perform the translation
-        const translatedText = await translateText(transcribedText, detectedLanguage, targetLanguage);
-        await generateSpeech(translatedText, targetLanguage);
-
-    } catch (error) {
-        updateStatus(`Error processing audio: ${error.message}`);
-    }
-}
-
 async function translateText(text, sourceLanguage, targetLanguage) {
     try {
         const response = await fetch('/.netlify/functions/openai-api', {
@@ -299,6 +322,7 @@ async function translateText(text, sourceLanguage, targetLanguage) {
         throw error;
     }
 }
+
 async function generateSpeech(text, language) {
     try {
         const response = await fetch('/.netlify/functions/openai-api', {
