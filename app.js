@@ -28,7 +28,7 @@ const ISOToLanguage = {
     "es": "Spanish"
 };
 
-const apiKey = ''; // We'll remove this later
+const apiKey = ''; // Ensure this is set properly in your environment
 
 document.addEventListener('DOMContentLoaded', function() {
     startButton = document.getElementById('startButton');
@@ -170,25 +170,17 @@ function stopConversation() {
 
 async function processAudio(audioBlob, language1, language2) {
     try {
-        // Transcribe the audio without assuming a specific language
         let transcribedText = await transcribeAudio(audioBlob);
-        
-        // Immediately detect the language of the transcription
         let detectedLanguage = await detectLanguage(transcribedText);
 
         console.log(`Detected language: ${detectedLanguage}, Language1: ${language1}, Language2: ${language2}`);
 
-        // Ensure that the detected language is either language1 or language2
         if (detectedLanguage !== language1 && detectedLanguage !== language2) {
-            throw new Error('Detected language does not match either of the selected languages');
+            updateStatus('Warning: Detected language does not match either of the selected languages. Proceeding with transcription.');
+            // Optionally, allow the user to proceed or manually select a language
         }
 
-        // Always translate to the other language, regardless of which was detected
         let targetLanguage = (detectedLanguage === language1) ? language2 : language1;
-
-        console.log(`Source language: ${detectedLanguage}, Target language: ${targetLanguage}`);
-
-        // Always perform the translation
         const translatedText = await translateText(transcribedText, detectedLanguage, targetLanguage);
         await generateSpeech(translatedText, targetLanguage);
 
@@ -197,35 +189,33 @@ async function processAudio(audioBlob, language1, language2) {
     }
 }
 
-async function transcribeAudio(audioBlob) {
-    try {
-        // Convert audioBlob to base64
-        const base64Audio = await blobToBase64(audioBlob);
+async function transcribeAudio(base64Audio) {
+    const formData = new FormData();
+    const buffer = Buffer.from(base64Audio, 'base64');
+    formData.append('file', buffer, { filename: 'audio.wav' });
+    formData.append('model', 'whisper-1');
+    formData.append('response_format', 'json');
 
-        const response = await fetch('/.netlify/functions/openai-api', {
+    try {
+        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                ...formData.getHeaders()
             },
-            body: JSON.stringify({
-                action: 'transcribe',
-                data: base64Audio
-            })
+            body: formData
         });
 
         if (!response.ok) {
-            const errorBody = await response.text();
-            throw new Error(`Transcription failed: ${response.status} ${response.statusText}. ${errorBody}`);
+            const errorResponse = await response.text();
+            console.error(`Transcription API Error: ${errorResponse}`);
+            throw new Error(`Transcription failed: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
-        updateStatus(`Transcribed: ${data.text}`);
-        document.getElementById('transcribedText').textContent = data.text;
-        
-        return data.text;
+        return { text: data.text };
     } catch (error) {
         console.error('Transcription error:', error);
-        updateStatus(`Transcription error: ${error.message}`);
         throw error;
     }
 }
