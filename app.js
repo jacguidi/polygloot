@@ -11,6 +11,7 @@ let continuousRecorder;
 let preBuffer = [];
 let preBufferDuration = 2000; // 2 seconds buffer
 let preBufferSize = preBufferDuration / 100; // Calculate buffer size
+let isProcessing = false; // Flag to control processing
 
 const languageToISO = {
     "English": "en",
@@ -27,7 +28,6 @@ const ISOToLanguage = {
     "tr": "Turkish",
     "es": "Spanish"
 };
-
 
 document.addEventListener('DOMContentLoaded', function() {
     startButton = document.getElementById('startButton');
@@ -94,7 +94,7 @@ async function startConversation() {
         let isRecording = false;
 
         speechEvents.on('speaking', function() {
-            if (!isRecording) {
+            if (!isRecording && !isProcessing) { // Check if processing is ongoing
                 // Start a new recording and include the pre-buffered audio
                 mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [...preBuffer]; // Start with pre-buffered audio
@@ -103,8 +103,11 @@ async function startConversation() {
                     audioChunks.push(event.data);
                 };
                 mediaRecorder.onstop = async () => {
+                    isProcessing = true; // Set processing flag
                     const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    await (audioBlob, language1, language2);
+                    await processAudio(audioBlob, language1, language2);
+                    isProcessing = false; // Reset processing flag after done
+                    audioChunks = []; // Clear after processing
                 };
                 mediaRecorder.start();
                 isRecording = true;
@@ -187,11 +190,9 @@ async function processAudio(audioBlob, language1, language2) {
         const translatedText = await translateText(transcribedText.text, detectedLanguage, targetLanguage);
         await generateSpeech(translatedText, targetLanguage);
 
-        // Reset the audioChunks for the next turn
-        audioChunks = [];
-
     } catch (error) {
         updateStatus(`Error processing audio: ${error.message}`);
+        isProcessing = false; // Ensure flag is reset on error
     }
 }
 
