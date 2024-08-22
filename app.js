@@ -198,25 +198,33 @@ async function processAudio(audioBlob, language1, language2) {
 
 async function transcribeAudio(base64Audio) {
     try {
-        // Make a request to the Netlify serverless function to handle the transcription
-        const response = await fetch('/.netlify/functions/openai-api', {
+        const formData = new FormData();
+        const buffer = Buffer.from(base64Audio, 'base64');
+        formData.append('file', buffer, { filename: 'audio.wav' });
+        formData.append('model', 'whisper-1');
+        formData.append('response_format', 'json');
+
+        console.log("Transcription request payload:", formData); // Log the formData content
+
+        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                ...formData.getHeaders()
             },
-            body: JSON.stringify({
-                action: 'transcribe',
-                data: base64Audio
-            })
+            body: formData
         });
 
+        console.log("Transcription response status:", response.status); // Log response status
+
         if (!response.ok) {
-            const errorResponse = await response.text();
-            console.error(`Transcription API Error: ${errorResponse}`);
+            const errorDetails = await response.text();
+            console.error("Transcription failed details:", errorDetails); // Log detailed error response
             throw new Error(`Transcription failed: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
+        console.log("Transcription result:", data); // Log the transcription result
         return { text: data.text };
     } catch (error) {
         console.error('Transcription error:', error);
