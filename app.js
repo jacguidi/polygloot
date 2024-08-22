@@ -104,7 +104,7 @@ async function startConversation() {
                 };
                 mediaRecorder.onstop = async () => {
                     const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    await processAudio(audioBlob, language1, language2);
+                    await (audioBlob, language1, language2);
                 };
                 mediaRecorder.start();
                 isRecording = true;
@@ -159,7 +159,7 @@ function stopConversation() {
     speechEvents = null;
     stream = null;
     audioChunks = [];
-    preBuffer = [];
+    preBuffer = []; // Reset preBuffer only when the conversation stops
 
     // Update status and button
     updateStatus('Conversation stopped');
@@ -169,14 +169,11 @@ function stopConversation() {
 
 async function processAudio(audioBlob, language1, language2) {
     try {
-        // Convert the audioBlob to base64
         const base64Audio = await blobToBase64(audioBlob);
 
-        // Log the type and content of base64Audio
         console.log("Type of base64Audio:", typeof base64Audio);
         console.log("Content of base64Audio:", base64Audio);
 
-        // Transcribe the audio
         let transcribedText = await transcribeAudio(base64Audio);
         let detectedLanguage = await detectLanguage(transcribedText.text);
 
@@ -189,6 +186,9 @@ async function processAudio(audioBlob, language1, language2) {
         let targetLanguage = (detectedLanguage === language1) ? language2 : language1;
         const translatedText = await translateText(transcribedText.text, detectedLanguage, targetLanguage);
         await generateSpeech(translatedText, targetLanguage);
+
+        // Reset the audioChunks for the next turn
+        audioChunks = [];
 
     } catch (error) {
         updateStatus(`Error processing audio: ${error.message}`);
