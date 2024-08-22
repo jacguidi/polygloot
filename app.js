@@ -198,9 +198,19 @@ async function processAudio(audioBlob, language1, language2) {
 
 async function transcribeAudio(base64Audio) {
     try {
+        // Convert base64 to binary string
+        const binaryString = atob(base64Audio);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const audioBlob = new Blob([bytes.buffer], { type: 'audio/wav' });
+
         const formData = new FormData();
-        const buffer = Buffer.from(base64Audio, 'base64');
-        formData.append('file', buffer, { filename: 'audio.wav' });
+        formData.append('file', audioBlob, 'audio.wav');
         formData.append('model', 'whisper-1');
         formData.append('response_format', 'json');
 
@@ -210,7 +220,6 @@ async function transcribeAudio(base64Audio) {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
-                ...formData.getHeaders()
             },
             body: formData
         });
@@ -219,164 +228,4 @@ async function transcribeAudio(base64Audio) {
 
         if (!response.ok) {
             const errorDetails = await response.text();
-            console.error("Transcription failed details:", errorDetails); // Log detailed error response
-            throw new Error(`Transcription failed: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log("Transcription result:", data); // Log the transcription result
-        return { text: data.text };
-    } catch (error) {
-        console.error('Transcription error:', error);
-        throw error;
-    }
-}
-
-// Helper function to convert Blob to base64
-function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-
-async function detectLanguage(text) {
-    try {
-        const response = await fetch('/.netlify/functions/openai-api', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'detectLanguage',
-                data: text
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Language detection failed: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        return data.detectedLanguage;
-    } catch (error) {
-        console.error('Language detection error:', error);
-        updateStatus(`Language detection error: ${error.message}`);
-        throw error;
-    }
-}
-
-async function translateText(text, sourceLanguage, targetLanguage) {
-    try {
-        const response = await fetch('/.netlify/functions/openai-api', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'translate',
-                data: {
-                    text: text,
-                    sourceLanguage: ISOToLanguage[sourceLanguage] || sourceLanguage,
-                    targetLanguage: ISOToLanguage[targetLanguage]
-                }
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Translation failed: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        let translatedText = data.translatedText;
-
-        // Double-check the translation
-        const doubleCheckResponse = await fetch('/.netlify/functions/openai-api', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'validateTranslation',
-                data: {
-                    originalText: text,
-                    translatedText: translatedText,
-                    sourceLanguage: ISOToLanguage[sourceLanguage] || sourceLanguage,
-                    targetLanguage: ISOToLanguage[targetLanguage]
-                }
-            })
-        });
-
-        if (!doubleCheckResponse.ok) {
-            throw new Error(`Translation validation failed: ${doubleCheckResponse.status} ${doubleCheckResponse.statusText}`);
-        }
-
-        const doubleCheckData = await doubleCheckResponse.json();
-        translatedText = doubleCheckData.validatedTranslation;
-
-        updateStatus(`Translated: ${translatedText}`);
-        return translatedText;
-    } catch (error) {
-        console.error('Translation error:', error);
-        updateStatus(`Translation error: ${error.message}`);
-        throw error;
-    }
-}
-
-async function generateSpeech(text, language) {
-    try {
-        const response = await fetch('/.netlify/functions/openai-api', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'generateSpeech',
-                data: {
-                    text: text,
-                    language: language,
-                    voice: 'alloy'
-                }
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Speech generation failed: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('Received audio data:', data.audio.substring(0, 100) + '...');
-
-        if (!data.audio) {
-            throw new Error('No audio data received from the server');
-        }
-
-        const audioBlob = base64ToBlob(data.audio, 'audio/mpeg');
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        await audio.play();
-
-        updateStatus(`Speech generated and playing`);
-    } catch (error) {
-        console.error('Speech generation error:', error);
-        updateStatus(`Speech generation error: ${error.message}`);
-    }
-}
-
-// Add this helper function to convert base64 to Blob
-function base64ToBlob(base64, mimeType) {
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], { type: mimeType });
-}
-
-function updateStatus(message) {
-    statusDiv.textContent = message;
-    console.log(message);
-}
+            console.error("Transcription 
