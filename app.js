@@ -216,10 +216,10 @@ async function transcribeAudio(base64Audio) {
 
         console.log("Transcription request payload:", formData); // Log the formData content
 
-        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        const response = await fetch('/.netlify/functions/openai-api', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
+                // Authorization is handled server-side, no need to add it here
             },
             body: formData
         });
