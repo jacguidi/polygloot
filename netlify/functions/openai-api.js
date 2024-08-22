@@ -57,6 +57,8 @@ async function transcribeAudio(base64Audio) {
   formData.append('model', 'whisper-1');
   formData.append('response_format', 'json');
 
+  console.log("Transcription request payload:", formData); // Log the formData content
+
   const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
     headers: {
@@ -66,11 +68,16 @@ async function transcribeAudio(base64Audio) {
     body: formData
   });
 
+  console.log("Transcription response status:", response.status); // Log response status
+
   if (!response.ok) {
+    const errorDetails = await response.text();
+    console.error("Transcription failed details:", errorDetails); // Log detailed error response
     throw new Error(`Transcription failed: ${response.status} ${response.statusText}`);
   }
 
   const data = await response.json();
+  console.log("Transcription result:", data); // Log the transcription result
   return { text: data.text };
 }
 
