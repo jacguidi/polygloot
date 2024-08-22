@@ -8,31 +8,41 @@ exports.handler = async function(event, context) {
 
   try {
     let result;
+    console.log(`Processing action: ${action}`); // Log the action being processed
+    
     switch (action) {
       case 'transcribe':
+        console.log("Action: Transcribe Audio");
         result = await transcribeAudio(data);
         break;
       case 'detectLanguage':
+        console.log("Action: Detect Language");
         result = await detectLanguage(data);
         break;
       case 'translate':
+        console.log("Action: Translate Text");
         result = await translateText(data.text, data.sourceLanguage, data.targetLanguage);
         break;
       case 'validateTranslation':
+        console.log("Action: Validate Translation");
         result = await validateTranslation(data.originalText, data.translatedText, data.sourceLanguage, data.targetLanguage);
         break;
       case 'generateSpeech':
+        console.log("Action: Generate Speech");
         result = await generateSpeech(data.text, data.language, data.voice);
         break;
       default:
         throw new Error('Invalid action');
     }
 
+    console.log("Result:", result); // Log the result of the action
+
     return {
       statusCode: 200,
       body: JSON.stringify(result)
     };
   } catch (error) {
+    console.error("Error occurred:", error.message); // Log the error message
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message })
