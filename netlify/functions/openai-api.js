@@ -5,7 +5,7 @@ const apiKey = process.env.OPENAI_API_KEY;
 
 console.log = (...args) => args.forEach(arg => console.error(typeof arg === 'object' ? JSON.stringify(arg) : arg));
 
-exports.handler = async function(event, context) {
+exports.handler = async function(event, context) {  // Ensure the handler function is async
   console.log('Received event:', event);
   console.log('Event body:', event.body);
   
@@ -30,7 +30,7 @@ exports.handler = async function(event, context) {
     switch (action) {
       case 'transcribe':
         console.log("Action: Transcribe Audio");
-        result = await transcribeAudio(data);
+        result = await transcribeAudio(data);  // Ensure async/await is used correctly
         break;
       // ... other cases remain the same ...
       default:
@@ -52,7 +52,7 @@ exports.handler = async function(event, context) {
   }
 };
 
-async function transcribeAudio(base64Audio) {
+async function transcribeAudio(base64Audio) {  // Mark the function as async
   console.log("Starting transcription process");
   console.log("Base64 audio length:", base64Audio.length);
 
@@ -64,7 +64,7 @@ async function transcribeAudio(base64Audio) {
 
   console.log("Transcription request payload:", formData);
 
-  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {  // await used correctly
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -81,16 +81,12 @@ async function transcribeAudio(base64Audio) {
     throw new Error(`Transcription failed: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json();
+  const data = await response.json();  // await used correctly
   console.log("Transcription result:", data);
   return { text: data.text };
 }
 
-  const data = await response.json();
-  console.log("Transcription result:", data); // Log the transcription result
-  return { text: data.text };
-}
-
+// Other async functions should follow the same pattern:
 async function detectLanguage(text) {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
