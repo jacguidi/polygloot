@@ -1,14 +1,31 @@
 const fetch = require('node-fetch');
 const FormData = require('form-data');
+console.log = (...args) => args.forEach(arg => console.error(typeof arg === 'object' ? JSON.stringify(arg) : arg));
 
 const apiKey = process.env.OPENAI_API_KEY;
 
 exports.handler = async function(event, context) {
-  const { action, data } = JSON.parse(event.body);
+  console.log('Received event:', event);
+  console.log('Event body:', event.body);
+  
+  let action, data;
+  try {
+    const parsedBody = JSON.parse(event.body);
+    console.log('Parsed body:', parsedBody);
+    action = parsedBody.action;
+    data = parsedBody.data;
+  } catch (error) {
+    console.log('Error parsing body:', error);
+    console.log('Raw body:', event.body);
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: 'Invalid request body' }),
+    };
+  }
 
   try {
     let result;
-    console.log(`Processing action: ${action}`); // Log the action being processed
+    console.log(`Processing action: ${action}`);
     
     switch (action) {
       case 'transcribe':
@@ -51,13 +68,16 @@ exports.handler = async function(event, context) {
 };
 
 async function transcribeAudio(base64Audio) {
+  console.log("Starting transcription process");
+  console.log("Base64 audio length:", base64Audio.length);
+
   const formData = new FormData();
   const buffer = Buffer.from(base64Audio, 'base64');
   formData.append('file', buffer, { filename: 'audio.wav' });
   formData.append('model', 'whisper-1');
   formData.append('response_format', 'json');
 
-  console.log("Transcription request payload:", formData); // Log the formData content
+  console.log("Transcription request payload:", formData);
 
   const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
