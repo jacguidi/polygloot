@@ -25,6 +25,34 @@ function mapLanguageCode(language) {
     }
 }
 
+// Get references to the checkbox and button for the disclaimer
+const understandCheckbox = document.getElementById('understandCheckbox');
+const acceptButton = document.getElementById('acceptButton');
+const disclaimerPopup = document.getElementById('disclaimerPopup');
+
+// Enable button when checkbox is checked
+understandCheckbox.addEventListener('change', function() {
+    if (this.checked) {
+        acceptButton.disabled = false;
+    } else {
+        acceptButton.disabled = true;
+    }
+});
+
+// Handle the click event on the "Start Chatting" button
+acceptButton.addEventListener('click', function() {
+    // Hide the popup
+    disclaimerPopup.style.display = 'none';
+
+    // Start the conversation (or any other initializations you want to trigger)
+    startConversation();
+});
+
+// Optionally, you can make the popup appear when the page loads
+window.onload = function() {
+    disclaimerPopup.style.display = 'flex';
+};
+
 // Function to start the conversation
 async function startConversation() {
     if (isRecording) return;
