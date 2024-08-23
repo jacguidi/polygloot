@@ -115,23 +115,43 @@ async function detectLanguage(audioBlob) {
         body: formData
     });
 
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
     const data = await response.json();
-    return data.language; // Returns the detected language code
+    return data.language;
 }
 
 // Function to transcribe audio using OpenAI API
 async function transcribeAudio(audioBlob, detectedLanguage) {
+    // Step 1: Create a FormData object to send the audio file
     const formData = new FormData();
+
+    // Step 2: Add the audio file to the FormData
     formData.append('file', audioBlob, 'audio.webm');
+
+    // Step 3: Add the model parameter (Whisper-1)
     formData.append('model', 'whisper-1');
+
+    // Step 4: Add the detected language
     formData.append('language', detectedLanguage);
 
+    // Step 5: Send the request to your Netlify function
     const response = await fetch('/.netlify/functions/transcribe', {
         method: 'POST',
         body: formData
     });
 
+    // Step 6: Check if the response is successful
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // Step 7: Parse the JSON response
     const data = await response.json();
+
+    // Step 8: Return the transcription
     return data.transcription;
 }
 
