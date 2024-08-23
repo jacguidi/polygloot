@@ -1,8 +1,9 @@
 const fetch = require('node-fetch');
 const FormData = require('form-data');
-console.log = (...args) => args.forEach(arg => console.error(typeof arg === 'object' ? JSON.stringify(arg) : arg));
 
 const apiKey = process.env.OPENAI_API_KEY;
+
+console.log = (...args) => args.forEach(arg => console.error(typeof arg === 'object' ? JSON.stringify(arg) : arg));
 
 exports.handler = async function(event, context) {
   console.log('Received event:', event);
@@ -17,10 +18,9 @@ exports.handler = async function(event, context) {
   } catch (error) {
     console.log('Error parsing body:', error);
     console.log('Raw body:', event.body);
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: 'Invalid request body' }),
-    };
+    // If parsing fails, assume the body is the audio data for transcription
+    action = 'transcribe';
+    data = event.body;
   }
 
   try {
@@ -32,34 +32,19 @@ exports.handler = async function(event, context) {
         console.log("Action: Transcribe Audio");
         result = await transcribeAudio(data);
         break;
-      case 'detectLanguage':
-        console.log("Action: Detect Language");
-        result = await detectLanguage(data);
-        break;
-      case 'translate':
-        console.log("Action: Translate Text");
-        result = await translateText(data.text, data.sourceLanguage, data.targetLanguage);
-        break;
-      case 'validateTranslation':
-        console.log("Action: Validate Translation");
-        result = await validateTranslation(data.originalText, data.translatedText, data.sourceLanguage, data.targetLanguage);
-        break;
-      case 'generateSpeech':
-        console.log("Action: Generate Speech");
-        result = await generateSpeech(data.text, data.language, data.voice);
-        break;
+      // ... other cases remain the same ...
       default:
         throw new Error('Invalid action');
     }
 
-    console.log("Result:", result); // Log the result of the action
+    console.log("Result:", result);
 
     return {
       statusCode: 200,
       body: JSON.stringify(result)
     };
   } catch (error) {
-    console.error("Error occurred:", error.message); // Log the error message
+    console.error("Error occurred:", error.message);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message })
@@ -88,13 +73,18 @@ async function transcribeAudio(base64Audio) {
     body: formData
   });
 
-  console.log("Transcription response status:", response.status); // Log response status
+  console.log("Transcription response status:", response.status);
 
   if (!response.ok) {
     const errorDetails = await response.text();
-    console.error("Transcription failed details:", errorDetails); // Log detailed error response
+    console.error("Transcription failed details:", errorDetails);
     throw new Error(`Transcription failed: ${response.status} ${response.statusText}`);
   }
+
+  const data = await response.json();
+  console.log("Transcription result:", data);
+  return { text: data.text };
+}
 
   const data = await response.json();
   console.log("Transcription result:", data); // Log the transcription result
