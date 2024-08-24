@@ -105,7 +105,7 @@ async function startConversation() {
                         isRecording = false;
                         updateStatus('Speech pause detected, processing audio');
                     }
-                }, 1500);
+                }, 1800);
             }
         });
 
