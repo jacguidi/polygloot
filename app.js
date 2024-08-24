@@ -74,7 +74,7 @@ async function startConversation() {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const options = {
             threshold: -45,
-            interval: 50
+            interval: 30
         };
         speechEvents = hark(stream, options);
         
