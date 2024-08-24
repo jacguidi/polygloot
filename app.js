@@ -229,12 +229,13 @@ async function processAudio(audioBlob, language1, language2) {
             throw new Error('Detected language does not match either of the selected languages');
         }
 
-        // Always translate to the other language, regardless of which was detected
+        // Determine the target language based on the detected language
+        // Always switch to the other language for translation
         let targetLanguage = (detectedLanguage === language1) ? language2 : language1;
 
         console.log(`Source language: ${detectedLanguage}, Target language: ${targetLanguage}`);
 
-        // Always perform the translation
+        // Perform the translation
         const translatedText = await translateText(transcribedText, detectedLanguage, targetLanguage);
         await generateSpeech(translatedText, targetLanguage);
 
