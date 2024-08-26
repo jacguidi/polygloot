@@ -45,26 +45,32 @@ exports.handler = async function(event, context) {
 async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
   const contentType = audioBlob.type || 'audio/wav';
 
-  // Ensure audioBlob is handled correctly (Buffer or Stream might be needed)
-  const response = await fetch('https://api.deepgram.com/v1/listen', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Token ${deepgramApiKey}`, // Corrected to use 'Token'
-      'Content-Type': contentType,
-    },
-    body: audioBlob, 
-  });
-
-  const responseBody = await response.text(); 
-
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText}. Response: ${responseBody}`);
-  }
-
   try {
-    return JSON.parse(responseBody);
-  } catch (jsonError) {
-    throw new Error(`Failed to parse JSON response: ${jsonError.message}. Response: ${responseBody}`);
+    // Ensure audioBlob is handled correctly (Buffer or Stream might be needed)
+    const response = await fetch('https://api.deepgram.com/v1/listen', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${deepgramApiKey}`, // Corrected to use 'Token'
+        'Content-Type': contentType,
+      },
+      body: audioBlob, 
+    });
+
+    const responseBody = await response.text(); // Read the response body as text
+    console.log('Raw Response from Deepgram:', responseBody); // Log the raw response
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status} ${response.statusText}. Response: ${responseBody}`);
+    }
+
+    try {
+      return JSON.parse(responseBody); // Attempt to parse the JSON response
+    } catch (jsonError) {
+      throw new Error(`Failed to parse JSON response: ${jsonError.message}. Response: ${responseBody}`);
+    }
+  } catch (error) {
+    console.error('Error in sendDeepgramRequest:', error.message);
+    throw error; // Re-throw the error to be handled by the caller
   }
 }
 
