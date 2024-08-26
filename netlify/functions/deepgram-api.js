@@ -36,7 +36,7 @@ exports.handler = async function(event, context) {
       body: JSON.stringify(result),
     };
   } catch (error) {
-    console.error('Error processing action:', action, error.message); // Log action and error message
+    console.error('Error processing action:', action, error.message);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message }),
@@ -44,15 +44,8 @@ exports.handler = async function(event, context) {
   }
 };
 
-const COMMON_API_PARAMS = {
-  encoding: 'linear16', // or other relevant encoding
-  sample_rate: 16000,
-  language: 'en-US',
-  model: 'general',
-};
-
 async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
-  const contentType = audioBlob.type || 'audio/wav'; // Handle content type dynamically
+  const contentType = audioBlob.type || 'audio/wav'; // Ensure content type matches the audio format
 
   const response = await fetch('https://api.deepgram.com/v1/listen', {
     method: 'POST',
@@ -66,6 +59,7 @@ async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
   const responseBody = await response.text(); // Read the response body
 
   if (!response.ok) {
+    // Log detailed error message including response body
     throw new Error(`API request failed: ${response.status} ${response.statusText}. Response: ${responseBody}`);
   }
 
@@ -73,7 +67,6 @@ async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
 }
 
 async function transcribeAudio({ audioBlob }, deepgramApiKey) {
-  // Combine common parameters with the specific request
   const data = await sendDeepgramRequest(audioBlob, deepgramApiKey);
 
   if (!data.results || !data.results.channels || !data.results.channels[0].alternatives[0].transcript) {
@@ -84,7 +77,6 @@ async function transcribeAudio({ audioBlob }, deepgramApiKey) {
 }
 
 async function detectContinuousSpeech({ audioBlob }, deepgramApiKey) {
-  // Combine common parameters with the specific request
   const data = await sendDeepgramRequest(audioBlob, deepgramApiKey);
 
   if (!data.results || !data.results.utterances) {
