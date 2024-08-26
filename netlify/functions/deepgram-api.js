@@ -1,15 +1,19 @@
 const fetch = require('node-fetch');
 
-const deepgramApiKey = process.env.deepgram_api_key;
-
-if (!deepgramApiKey) {
-  throw new Error('deepgram_api_key environment variable is not set.');
-}
-
 exports.handler = async function(event, context) {
+  const deepgramApiKey = process.env.deepgram_api_key;
+
+  if (!deepgramApiKey) {
+    throw new Error('deepgram_api_key environment variable is not set.');
+  }
+
   const { action, data } = JSON.parse(event.body);
 
   try {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid input data');
+    }
+
     const actionHandlers = {
       transcribe: transcribeAudio,
       detectContinuousSpeech: detectContinuousSpeech,
@@ -20,13 +24,13 @@ exports.handler = async function(event, context) {
       throw new Error('Invalid action');
     }
 
-    const result = await handler(data);
+    const result = await handler(data, deepgramApiKey);
     return {
       statusCode: 200,
       body: JSON.stringify(result),
     };
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error processing action:', action, 'with data:', data, error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message }),
@@ -34,11 +38,18 @@ exports.handler = async function(event, context) {
   }
 };
 
-async function ApiRequest(payload) {
-  const response = await fetch('https://api..com/v1/listen', {
+const COMMON_API_PARAMS = {
+  encoding: 'linear16',
+  sample_rate: 16000,
+  language: 'en-US',
+  model: 'general',
+};
+
+async function sendDeepgramRequest(payload, deepgramApiKey) {
+  const response = await fetch('https://api.deepgram.com/v1/listen', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${ApiKey}`,
+      'Authorization': `Bearer ${deepgramApiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
@@ -51,30 +62,24 @@ async function ApiRequest(payload) {
   return response.json();
 }
 
-async function transcribeAudio(base64Audio) {
-  const data = await ApiRequest({
+async function transcribeAudio({ base64Audio }, deepgramApiKey) {
+  const data = await sendDeepgramRequest({
+    ...COMMON_API_PARAMS,
     audio: base64Audio,
-    encoding: 'linear16',
-    sample_rate: 16000,
-    language: 'en-US',
-    model: 'general',
     punctuation: true,
-  });
+  }, deepgramApiKey);
 
   return { text: data.results.channels[0].alternatives[0].transcript };
 }
 
-async function detectContinuousSpeech(base64Audio) {
-  const data = await ApiRequest({
+async function detectContinuousSpeech({ base64Audio }, deepgramApiKey) {
+  const data = await sendDeepgramRequest({
+    ...COMMON_API_PARAMS,
     audio: base64Audio,
-    encoding: 'linear16',
-    sample_rate: 16000,
-    language: 'en-US',
-    model: 'general',
     detect_language: true,
     diarize: true,
     utterances: true,
-  });
+  }, deepgramApiKey);
 
   const utterances = data.results.utterances.map((utterance) => ({
     start: utterance.start,
@@ -84,4 +89,3 @@ async function detectContinuousSpeech(base64Audio) {
 
   return { utterances };
 }
-
