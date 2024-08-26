@@ -106,17 +106,12 @@ function stopConversation() {
 
 async function transcribeAudio(audioBlob) {
     try {
-        const base64Audio = await blobToBase64(audioBlob);
-
         const response = await fetch('/.netlify/functions/deepgram-api', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': audioBlob.type || 'audio/wav', // Dynamically set Content-Type
             },
-            body: JSON.stringify({
-                action: 'transcribe',
-                data: base64Audio
-            })
+            body: audioBlob // Send the Blob directly
         });
 
         if (!response.ok) {
@@ -124,11 +119,16 @@ async function transcribeAudio(audioBlob) {
             throw new Error(`Transcription failed: ${response.status} ${response.statusText}. ${errorBody}`);
         }
 
-        const data = await response.json();
-        updateStatus(`Transcribed: ${data.text}`);
-        document.getElementById('transcribedText').textContent = data.text;
-        
-        return data.text;
+        const contentType = response.headers.get('Content-Type');
+        if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            updateStatus(`Transcribed: ${data.text}`);
+            document.getElementById('transcribedText').textContent = data.text;
+            return data.text;
+        } else {
+            const errorBody = await response.text();
+            throw new Error(`Unexpected response format: ${contentType}. ${errorBody}`);
+        }
     } catch (error) {
         console.error('Transcription error:', error);
         updateStatus(`Transcription error: ${error.message}`);
