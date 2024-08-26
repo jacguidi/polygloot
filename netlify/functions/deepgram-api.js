@@ -1,16 +1,15 @@
 const fetch = require('node-fetch');
 
 exports.handler = async function(event, context) {
-  const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
+  const deepgramApiKey = process.env.DEEPGRAM_API_KEY; // Use uppercase for environment variables
 
   if (!deepgramApiKey) {
     throw new Error('DEEPGRAM_API_KEY environment variable is not set.');
   }
 
-  let action = null; // Declare action outside of try block for broader scope
+  let action = null;
 
   try {
-    // Parse and validate input data
     const requestBody = JSON.parse(event.body);
     action = requestBody.action;
     const data = requestBody.data;
@@ -29,7 +28,6 @@ exports.handler = async function(event, context) {
       throw new Error('Invalid action: Action not recognized.');
     }
 
-    // Process the action with the appropriate handler
     const result = await handler(data, deepgramApiKey);
     return {
       statusCode: 200,
@@ -45,25 +43,29 @@ exports.handler = async function(event, context) {
 };
 
 async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
-  const contentType = audioBlob.type || 'audio/wav'; // Ensure content type matches the audio format
+  const contentType = audioBlob.type || 'audio/wav';
 
+  // Ensure audioBlob is handled correctly (Buffer or Stream might be needed)
   const response = await fetch('https://api.deepgram.com/v1/listen', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${deepgramApiKey}`,
-      'Content-Type': contentType, // Set content type based on Blob type
+      'Authorization': `Token ${deepgramApiKey}`, // Corrected to use 'Token'
+      'Content-Type': contentType,
     },
-    body: audioBlob, // Send the Blob directly
+    body: audioBlob, 
   });
 
-  const responseBody = await response.text(); // Read the response body
+  const responseBody = await response.text(); 
 
   if (!response.ok) {
-    // Log detailed error message including response body
     throw new Error(`API request failed: ${response.status} ${response.statusText}. Response: ${responseBody}`);
   }
 
-  return JSON.parse(responseBody); // Parse the JSON response
+  try {
+    return JSON.parse(responseBody);
+  } catch (jsonError) {
+    throw new Error(`Failed to parse JSON response: ${jsonError.message}. Response: ${responseBody}`);
+  }
 }
 
 async function transcribeAudio({ audioBlob }, deepgramApiKey) {
