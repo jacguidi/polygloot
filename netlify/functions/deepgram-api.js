@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 
 exports.handler = async function(event, context) {
-  const deepgramApiKey = process.env.DEEPGRAM_API_KEY; // Use uppercase for environment variables
+  const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
 
   if (!deepgramApiKey) {
     throw new Error('DEEPGRAM_API_KEY environment variable is not set.');
@@ -46,31 +46,30 @@ async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
   const contentType = audioBlob.type || 'audio/wav';
 
   try {
-    // Ensure audioBlob is handled correctly (Buffer or Stream might be needed)
     const response = await fetch('https://api.deepgram.com/v1/listen', {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${deepgramApiKey}`, // Corrected to use 'Token'
+        'Authorization': `Token ${deepgramApiKey}`,
         'Content-Type': contentType,
       },
-      body: audioBlob, 
+      body: audioBlob,
     });
 
-    const responseBody = await response.text(); // Read the response body as text
-    console.log('Raw Response from Deepgram:', responseBody); // Log the raw response
+    const responseBody = await response.text();
+    console.log('Raw Response from Deepgram:', responseBody);
 
     if (!response.ok) {
       throw new Error(`API request failed: ${response.status} ${response.statusText}. Response: ${responseBody}`);
     }
 
     try {
-      return JSON.parse(responseBody); // Attempt to parse the JSON response
+      return JSON.parse(responseBody);
     } catch (jsonError) {
       throw new Error(`Failed to parse JSON response: ${jsonError.message}. Response: ${responseBody}`);
     }
   } catch (error) {
     console.error('Error in sendDeepgramRequest:', error.message);
-    throw error; // Re-throw the error to be handled by the caller
+    throw error;
   }
 }
 
