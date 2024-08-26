@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 
-const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
+const deepgramApiKey = process.env.deepgram_api_key;
 
 if (!deepgramApiKey) {
   throw new Error('DEEPGRAM_API_KEY environment variable is not set.');
