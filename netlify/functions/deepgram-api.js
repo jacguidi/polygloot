@@ -7,9 +7,13 @@ exports.handler = async function(event, context) {
     throw new Error('deepgram_api_key environment variable is not set.');
   }
 
+  let action = null; // Declare action outside of try block for broader scope
+
   try {
     // Parse and validate input data
-    const { action, data } = JSON.parse(event.body);
+    const requestBody = JSON.parse(event.body);
+    action = requestBody.action;
+    const data = requestBody.data;
 
     if (!data || typeof data !== 'object' || !data.audioBlob) {
       throw new Error('Invalid input data: audioBlob is required and must be an object.');
@@ -32,7 +36,7 @@ exports.handler = async function(event, context) {
       body: JSON.stringify(result),
     };
   } catch (error) {
-    console.error('Error processing action:', action, error.message);
+    console.error('Error processing action:', action, error.message); // Log action and error message
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message }),
