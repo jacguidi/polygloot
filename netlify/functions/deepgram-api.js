@@ -7,11 +7,12 @@ exports.handler = async function(event, context) {
     throw new Error('deepgram_api_key environment variable is not set.');
   }
 
-  const { action, data } = JSON.parse(event.body);
-
   try {
-    if (!data || typeof data !== 'object') {
-      throw new Error('Invalid input data');
+    // Parse and validate input data
+    const { action, data } = JSON.parse(event.body);
+
+    if (!data || typeof data !== 'object' || !data.audioBlob) {
+      throw new Error('Invalid input data: audioBlob is required and must be an object.');
     }
 
     const actionHandlers = {
@@ -21,16 +22,17 @@ exports.handler = async function(event, context) {
 
     const handler = actionHandlers[action];
     if (!handler) {
-      throw new Error('Invalid action');
+      throw new Error('Invalid action: Action not recognized.');
     }
 
+    // Process the action with the appropriate handler
     const result = await handler(data, deepgramApiKey);
     return {
       statusCode: 200,
       body: JSON.stringify(result),
     };
   } catch (error) {
-    console.error('Error processing action:', action, 'with data:', data, error);
+    console.error('Error processing action:', action, error.message);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message }),
@@ -39,47 +41,51 @@ exports.handler = async function(event, context) {
 };
 
 const COMMON_API_PARAMS = {
-  encoding: 'linear16',
+  encoding: 'linear16', // or other relevant encoding
   sample_rate: 16000,
   language: 'en-US',
   model: 'general',
 };
 
-async function sendDeepgramRequest(payload, deepgramApiKey) {
+async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
+  const contentType = audioBlob.type || 'audio/wav'; // Handle content type dynamically
+
   const response = await fetch('https://api.deepgram.com/v1/listen', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${deepgramApiKey}`,
-      'Content-Type': 'application/json',
+      'Content-Type': contentType, // Set content type based on Blob type
     },
-    body: JSON.stringify(payload),
+    body: audioBlob, // Send the Blob directly
   });
 
+  const responseBody = await response.text(); // Read the response body
+
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    throw new Error(`API request failed: ${response.status} ${response.statusText}. Response: ${responseBody}`);
   }
 
-  return response.json();
+  return JSON.parse(responseBody); // Parse the JSON response
 }
 
-async function transcribeAudio({ base64Audio }, deepgramApiKey) {
-  const data = await sendDeepgramRequest({
-    ...COMMON_API_PARAMS,
-    audio: base64Audio,
-    punctuation: true,
-  }, deepgramApiKey);
+async function transcribeAudio({ audioBlob }, deepgramApiKey) {
+  // Combine common parameters with the specific request
+  const data = await sendDeepgramRequest(audioBlob, deepgramApiKey);
+
+  if (!data.results || !data.results.channels || !data.results.channels[0].alternatives[0].transcript) {
+    throw new Error('Transcription failed: Invalid response format from Deepgram.');
+  }
 
   return { text: data.results.channels[0].alternatives[0].transcript };
 }
 
-async function detectContinuousSpeech({ base64Audio }, deepgramApiKey) {
-  const data = await sendDeepgramRequest({
-    ...COMMON_API_PARAMS,
-    audio: base64Audio,
-    detect_language: true,
-    diarize: true,
-    utterances: true,
-  }, deepgramApiKey);
+async function detectContinuousSpeech({ audioBlob }, deepgramApiKey) {
+  // Combine common parameters with the specific request
+  const data = await sendDeepgramRequest(audioBlob, deepgramApiKey);
+
+  if (!data.results || !data.results.utterances) {
+    throw new Error('Continuous speech detection failed: Invalid response format from Deepgram.');
+  }
 
   const utterances = data.results.utterances.map((utterance) => ({
     start: utterance.start,
