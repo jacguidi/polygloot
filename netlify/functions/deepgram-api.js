@@ -56,16 +56,23 @@ async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
     });
 
     const responseBody = await response.text();
+    console.log('Response Status:', response.status);
+    console.log('Response Headers:', JSON.stringify(response.headers.raw(), null, 2));
     console.log('Raw Response from Deepgram:', responseBody);
 
     if (!response.ok) {
       throw new Error(`API request failed: ${response.status} ${response.statusText}. Response: ${responseBody}`);
     }
 
-    try {
-      return JSON.parse(responseBody);
-    } catch (jsonError) {
-      throw new Error(`Failed to parse JSON response: ${jsonError.message}. Response: ${responseBody}`);
+    // Check if the response is in JSON format or not
+    if (response.headers.get('content-type').includes('application/json')) {
+      try {
+        return JSON.parse(responseBody);
+      } catch (jsonError) {
+        throw new Error(`Failed to parse JSON response: ${jsonError.message}. Response: ${responseBody}`);
+      }
+    } else {
+      throw new Error(`Unexpected non-JSON response from Deepgram API. Response: ${responseBody}`);
     }
   } catch (error) {
     console.error('Error in sendDeepgramRequest:', error.message);
