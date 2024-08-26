@@ -1,10 +1,10 @@
 const fetch = require('node-fetch');
 
 exports.handler = async function(event, context) {
-  const deepgramApiKey = process.env.deepgram_api_key;
+  const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
 
   if (!deepgramApiKey) {
-    throw new Error('deepgram_api_key environment variable is not set.');
+    throw new Error('DEEPGRAM_API_KEY environment variable is not set.');
   }
 
   let action = null; // Declare action outside of try block for broader scope
