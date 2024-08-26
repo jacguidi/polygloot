@@ -3,7 +3,7 @@ const fetch = require('node-fetch');
 const deepgramApiKey = process.env.deepgram_api_key;
 
 if (!deepgramApiKey) {
-  throw new Error('DEEPGRAM_API_KEY environment variable is not set.');
+  throw new Error('deepgram_api_key environment variable is not set.');
 }
 
 exports.handler = async function(event, context) {
@@ -34,11 +34,11 @@ exports.handler = async function(event, context) {
   }
 };
 
-async function deepgramApiRequest(payload) {
-  const response = await fetch('https://api.deepgram.com/v1/listen', {
+async function ApiRequest(payload) {
+  const response = await fetch('https://api..com/v1/listen', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${deepgramApiKey}`,
+      'Authorization': `Bearer ${ApiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
@@ -52,7 +52,7 @@ async function deepgramApiRequest(payload) {
 }
 
 async function transcribeAudio(base64Audio) {
-  const data = await deepgramApiRequest({
+  const data = await ApiRequest({
     audio: base64Audio,
     encoding: 'linear16',
     sample_rate: 16000,
@@ -65,7 +65,7 @@ async function transcribeAudio(base64Audio) {
 }
 
 async function detectContinuousSpeech(base64Audio) {
-  const data = await deepgramApiRequest({
+  const data = await ApiRequest({
     audio: base64Audio,
     encoding: 'linear16',
     sample_rate: 16000,
