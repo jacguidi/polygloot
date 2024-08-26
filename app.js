@@ -5,7 +5,6 @@ let transcribedTextElement;
 let statusDiv;
 let mediaRecorder;
 let audioChunks = [];
-let speechEvents;
 let stream;
 
 const languageToISO = {
@@ -24,8 +23,6 @@ const ISOToLanguage = {
     "es": "Spanish"  
 };
 
-const apiKey = ''; // We'll remove this later
-
 document.addEventListener('DOMContentLoaded', function() {
     startButton = document.getElementById('startButton');
     language1Select = document.getElementById('language1');
@@ -33,27 +30,21 @@ document.addEventListener('DOMContentLoaded', function() {
     transcribedTextElement = document.getElementById('transcribedText');
     statusDiv = document.getElementById('status');
 
-    // Disclaimer popup elements
     const disclaimerPopup = document.getElementById('disclaimerPopup');
     const understandCheckbox = document.getElementById('understandCheckbox');
     const acceptButton = document.getElementById('acceptButton');
 
-    // Show the disclaimer popup when the page loads
     disclaimerPopup.style.display = 'block';
 
-    // Enable/disable the accept button based on checkbox
     understandCheckbox.addEventListener('change', function() {
         acceptButton.disabled = !this.checked;
     });
 
-    // Hide the popup when the user accepts
     acceptButton.addEventListener('click', function() {
         disclaimerPopup.style.display = 'none';
-        // Now we can enable the start conversation button
         startButton.disabled = false;
     });
 
-    // Initially disable the start conversation button
     startButton.disabled = true;
     startButton.onclick = startConversation;
 });
@@ -72,74 +63,42 @@ async function startConversation() {
     
     try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const options = {
-            threshold: -45,
-            interval: 30
-        };
-        speechEvents = hark(stream, options);
+        mediaRecorder = new MediaRecorder(stream);
         
-        let isRecording = false;
+        mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+        };
 
-        speechEvents.on('speaking', function() {
-            if (!isRecording) {
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
-                };
-                mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    await processAudio(audioBlob, language1, language2);
-                };
-                mediaRecorder.start();
-                audioChunks = [];
-                isRecording = true;
-                updateStatus('Speaking detected, recording started');
-            }
-        });
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            await processAudio(audioBlob, language1, language2);
+        };
 
-        speechEvents.on('stopped_speaking', function() {
-            if (isRecording && mediaRecorder) {
-                setTimeout(() => {
-                    if (isRecording && mediaRecorder.state === 'recording') {
-                        mediaRecorder.stop();
-                        isRecording = false;
-                        updateStatus('Speech pause detected, processing audio');
-                    }
-                }, 1800);
-            }
-        });
-
+        mediaRecorder.start();
         updateStatus(`Conversation started between ${ISOToLanguage[language1]} and ${ISOToLanguage[language2]}`);
         startButton.textContent = 'Stop Conversation';
         startButton.onclick = stopConversation;
+
+        stream.getTracks()[0].addEventListener('ended', stopConversation);
+
     } catch (error) {
         updateStatus(`Error: ${error.message}`);
     }
 }
 
 function stopConversation() {
-    // Stop the media recorder if it exists
-    if (mediaRecorder) {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
         mediaRecorder.stop();
     }
     
-    // Stop the speech events if they exist
-    if (speechEvents) {
-        speechEvents.stop();
-    }
-    
-    // Stop all tracks in the audio stream if it exists
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
     }
     
-    // Reset all variables
     mediaRecorder = null;
-    speechEvents = null;
     stream = null;
     audioChunks = [];
     
-    // Update status and button
     updateStatus('Conversation stopped');
     startButton.textContent = 'Start Conversation';
     startButton.onclick = startConversation;
@@ -147,10 +106,9 @@ function stopConversation() {
 
 async function transcribeAudio(audioBlob) {
     try {
-        // Convert audioBlob to base64
         const base64Audio = await blobToBase64(audioBlob);
 
-        const response = await fetch('/.netlify/functions/openai-api', {
+        const response = await fetch('/.netlify/functions/deepgram-api', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -178,65 +136,17 @@ async function transcribeAudio(audioBlob) {
     }
 }
 
-// Helper function to convert Blob to base64
-function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-
-async function detectLanguage(text) {
-    try {
-        const response = await fetch('/.netlify/functions/openai-api', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'detectLanguage',
-                data: text
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Language detection failed: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        return data.detectedLanguage;
-    } catch (error) {
-        console.error('Language detection error:', error);
-        updateStatus(`Language detection error: ${error.message}`);
-        throw error;
-    }
-}
-
 async function processAudio(audioBlob, language1, language2) {
     try {
-        // Transcribe the audio without assuming a specific language
         let transcribedText = await transcribeAudio(audioBlob);
-        
-        // Immediately detect the language of the transcription
         let detectedLanguage = await detectLanguage(transcribedText);
 
-        console.log(`Detected language: ${detectedLanguage}, Language1: ${language1}, Language2: ${language2}`);
-
-        // Ensure that the detected language is either language1 or language2
         if (detectedLanguage !== language1 && detectedLanguage !== language2) {
             throw new Error('Detected language does not match either of the selected languages');
         }
 
-        // Determine the target language based on the detected language
-        // Always switch to the other language for translation
         let targetLanguage = (detectedLanguage === language1) ? language2 : language1;
-
-        console.log(`Source language: ${detectedLanguage}, Target language: ${targetLanguage}`);
-
-        // Perform the translation
-        const translatedText = await translateText(transcribedText, detectedLanguage, targetLanguage);
+        let translatedText = await translateText(transcribedText, detectedLanguage, targetLanguage);
         await generateSpeech(translatedText, targetLanguage);
 
     } catch (error) {
@@ -268,7 +178,6 @@ async function translateText(text, sourceLanguage, targetLanguage) {
         const data = await response.json();
         let translatedText = data.translatedText;
 
-        // Double-check the translation
         const doubleCheckResponse = await fetch('/.netlify/functions/openai-api', {
             method: 'POST',
             headers: {
@@ -300,6 +209,7 @@ async function translateText(text, sourceLanguage, targetLanguage) {
         throw error;
     }
 }
+
 async function generateSpeech(text, language) {
     try {
         const response = await fetch('/.netlify/functions/openai-api', {
@@ -340,7 +250,15 @@ async function generateSpeech(text, language) {
     }
 }
 
-// Add this helper function to convert base64 to Blob
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
 function base64ToBlob(base64, mimeType) {
     const byteCharacters = atob(base64);
     const byteNumbers = new Array(byteCharacters.length);
