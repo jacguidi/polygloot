@@ -16,9 +16,11 @@ exports.handler = async function(event, context) {
   }
 
   // Handle multipart form data
-  if (event.headers['content-type'].includes('multipart/form-data')) {
+  if (event.headers['content-type'] && event.headers['content-type'].includes('multipart/form-data')) {
     try {
       const form = new formidable.IncomingForm();
+      form.keepExtensions = true; // Keeps file extensions
+      form.maxFileSize = 10 * 1024 * 1024; // Sets maximum file size to 10MB (adjust as needed)
 
       // Parse the form data
       return new Promise((resolve, reject) => {
