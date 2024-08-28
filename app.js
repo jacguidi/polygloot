@@ -49,6 +49,12 @@ document.addEventListener('DOMContentLoaded', function() {
     startButton.onclick = startConversation;
 });
 
+// Function to update the status message
+function updateStatus(message) {
+    statusDiv.textContent = message;
+    console.log(message);
+}
+
 async function startConversation() {
     if (startButton.disabled) {
         updateStatus('Please accept the disclaimer before starting the conversation.');
@@ -109,7 +115,7 @@ async function transcribeAudio(audioBlob) {
         const formData = new FormData();
         formData.append('file', audioBlob, 'audio.webm');
         formData.append('model', 'general');
-        formData.append('action', 'transcribe'); 
+        formData.append('action', 'transcribe');
 
         console.log('Sending request with:', 
             Array.from(formData.entries()).map(e => `${e[0]}: ${e[1] instanceof Blob ? 'Blob' : e[1]}`));
@@ -128,7 +134,7 @@ async function transcribeAudio(audioBlob) {
         if (data.results && data.results.channels && data.results.channels[0].alternatives) {
             const transcript = data.results.channels[0].alternatives[0].transcript;
             updateStatus(`Transcribed: ${transcript}`);
-            document.getElementById('transcribedText').textContent = transcript;
+            transcribedTextElement.textContent = transcript;
             return transcript;
         } else {
             throw new Error('Unexpected response format from Deepgram API');
@@ -138,4 +144,165 @@ async function transcribeAudio(audioBlob) {
         updateStatus(`Transcription error: ${error.message}`);
         throw error;
     }
+}
+
+async function processAudio(audioBlob, language1, language2) {
+    try {
+        let transcribedText = await transcribeAudio(audioBlob);
+        let detectedLanguage = await detectLanguage(transcribedText);
+
+        if (detectedLanguage !== language1 && detectedLanguage !== language2) {
+            throw new Error('Detected language does not match either of the selected languages');
+        }
+
+        let targetLanguage = (detectedLanguage === language1) ? language2 : language1;
+        let translatedText = await translateText(transcribedText, detectedLanguage, targetLanguage);
+        await generateSpeech(translatedText, targetLanguage);
+
+    } catch (error) {
+        updateStatus(`Error processing audio: ${error.message}`);
+    }
+}
+
+async function detectLanguage(text) {
+    try {
+        console.log('Detecting language for:', text);
+        const response = await fetch('/.netlify/functions/openai-api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'detectLanguage',
+                data: { text: text }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Language detection failed: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('Detected language:', data.detectedLanguage);
+        return data.detectedLanguage;
+    } catch (error) {
+        console.error('Language detection error:', error);
+        updateStatus(`Language detection error: ${error.message}`);
+        throw error;
+    }
+}
+
+async function translateText(text, sourceLanguage, targetLanguage) {
+    try {
+        const response = await fetch('/.netlify/functions/openai-api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'translate',
+                data: {
+                    text: text,
+                    sourceLanguage: ISOToLanguage[sourceLanguage] || sourceLanguage,
+                    targetLanguage: ISOToLanguage[targetLanguage]
+                }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Translation failed: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        let translatedText = data.translatedText;
+
+        const doubleCheckResponse = await fetch('/.netlify/functions/openai-api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'validateTranslation',
+                data: {
+                    originalText: text,
+                    translatedText: translatedText,
+                    sourceLanguage: ISOToLanguage[sourceLanguage] || sourceLanguage,
+                    targetLanguage: ISOToLanguage[targetLanguage]
+                }
+            })
+        });
+
+        if (!doubleCheckResponse.ok) {
+            throw new Error(`Translation validation failed: ${doubleCheckResponse.status} ${doubleCheckResponse.statusText}`);
+        }
+
+        const doubleCheckData = await doubleCheckResponse.json();
+        translatedText = doubleCheckData.validatedTranslation;
+
+        updateStatus(`Translated: ${translatedText}`);
+        return translatedText;
+    } catch (error) {
+        console.error('Translation error:', error);
+        updateStatus(`Translation error: ${error.message}`);
+        throw error;
+    }
+}
+
+async function generateSpeech(text, language) {
+    try {
+        const response = await fetch('/.netlify/functions/openai-api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'generateSpeech',
+                data: {
+                    text: text,
+                    language: language,
+                    voice: 'alloy'
+                }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Speech generation failed: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('Received audio data:', data.audio.substring(0, 100) + '...');
+
+        if (!data.audio) {
+            throw new Error('No audio data received from the server');
+        }
+
+        const audioBlob = base64ToBlob(data.audio, 'audio/mpeg');
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        await audio.play();
+
+        updateStatus(`Speech generated and playing`);
+    } catch (error) {
+        console.error('Speech generation error:', error);
+        updateStatus(`Speech generation error: ${error.message}`);
+    }
+}
+
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+function base64ToBlob(base64, mimeType) {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
 }
