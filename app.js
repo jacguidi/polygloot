@@ -70,11 +70,11 @@ async function startConversation() {
         };
 
         mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
             await processAudio(audioBlob, language1, language2);
         };
 
-        mediaRecorder.start();
+        mediaRecorder.start(1000);
         updateStatus(`Conversation started between ${ISOToLanguage[language1]} and ${ISOToLanguage[language2]}`);
         startButton.textContent = 'Stop Conversation';
         startButton.onclick = stopConversation;
@@ -106,12 +106,13 @@ function stopConversation() {
 
 async function transcribeAudio(audioBlob) {
     try {
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'audio.webm');
+        formData.append('model', 'general');
+
         const response = await fetch('/.netlify/functions/deepgram-api', {
             method: 'POST',
-            headers: {
-                'Content-Type': audioBlob.type || 'audio/wav', // Dynamically set Content-Type
-            },
-            body: audioBlob // Send the Blob directly
+            body: formData
         });
 
         if (!response.ok) {
@@ -119,19 +120,46 @@ async function transcribeAudio(audioBlob) {
             throw new Error(`Transcription failed: ${response.status} ${response.statusText}. ${errorBody}`);
         }
 
-        const contentType = response.headers.get('Content-Type');
-        if (contentType && contentType.includes('application/json')) {
-            const data = await response.json();
-            updateStatus(`Transcribed: ${data.text}`);
-            document.getElementById('transcribedText').textContent = data.text;
-            return data.text;
+        const data = await response.json();
+        if (data.results && data.results.channels && data.results.channels[0].alternatives) {
+            const transcript = data.results.channels[0].alternatives[0].transcript;
+            updateStatus(`Transcribed: ${transcript}`);
+            document.getElementById('transcribedText').textContent = transcript;
+            return transcript;
         } else {
-            const errorBody = await response.text();
-            throw new Error(`Unexpected response format: ${contentType}. ${errorBody}`);
+            throw new Error('Unexpected response format from Deepgram API');
         }
     } catch (error) {
         console.error('Transcription error:', error);
         updateStatus(`Transcription error: ${error.message}`);
+        throw error;
+    }
+}
+
+async function detectLanguage(text) {
+    try {
+        console.log('Detecting language for:', text);
+        const response = await fetch('/.netlify/functions/openai-api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'detectLanguage',
+                data: { text: text }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Language detection failed: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('Detected language:', data.detectedLanguage);
+        return data.detectedLanguage;
+    } catch (error) {
+        console.error('Language detection error:', error);
+        updateStatus(`Language detection error: ${error.message}`);
         throw error;
     }
 }
