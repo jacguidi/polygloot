@@ -4,7 +4,7 @@ const { Buffer } = require('buffer');
 
 exports.handler = async function (event) {
   console.log('Received event:', JSON.stringify(event, null, 2));
-  
+
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
@@ -79,7 +79,7 @@ async function sendDeepgramRequest(audioBlob, deepgramApiKey, model) {
       method: 'POST',
       headers: {
         'Authorization': `Token ${deepgramApiKey}`,
-        'Content-Type': 'audio/webm',
+        'Content-Type': 'audio/webm; codecs=opus', // Corrected content type
       },
       body: audioBlob,
     });
