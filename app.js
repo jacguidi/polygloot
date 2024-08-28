@@ -109,6 +109,10 @@ async function transcribeAudio(audioBlob) {
         const formData = new FormData();
         formData.append('file', audioBlob, 'audio.webm');
         formData.append('model', 'general');
+        formData.append('action', 'transcribe'); // Add this line
+
+        console.log('Sending request with:', 
+            Array.from(formData.entries()).map(e => `${e[0]}: ${e[1] instanceof Blob ? 'Blob' : e[1]}`));
 
         const response = await fetch('/.netlify/functions/deepgram-api', {
             method: 'POST',
