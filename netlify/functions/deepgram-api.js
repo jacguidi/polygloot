@@ -1,6 +1,9 @@
 const fetch = require('node-fetch');
 
 exports.handler = async function(event, context) {
+  // Log the incoming request for debugging
+  console.log('Received event:', JSON.stringify(event, null, 2));
+
   // Ensure the request is a POST request
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
@@ -15,6 +18,8 @@ exports.handler = async function(event, context) {
 
   try {
     console.log('Received event body:', event.body);
+    
+    // Log the incoming body to see if it's correctly formatted
     const requestBody = JSON.parse(event.body);
     action = requestBody.action;
     const data = requestBody.data;
@@ -61,11 +66,20 @@ async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
       body: audioBlob,
     });
 
+    // Log the content type of the response
+    const contentType = response.headers.get('content-type');
+    console.log('Response Content-Type from Deepgram:', contentType);
+
     const responseBody = await response.text();
     console.log('Raw Response from Deepgram:', responseBody);
 
     if (!response.ok) {
       throw new Error(`API request failed: ${response.status} ${response.statusText}. Response: ${responseBody}`);
+    }
+
+    // Ensure content type is JSON before parsing
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error(`Expected JSON response but received: ${contentType}`);
     }
 
     try {
