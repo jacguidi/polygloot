@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
-const formidable = require('formidable'); // Add formidable to handle form data
-const fs = require('fs'); // Add fs module to read files
+const formidable = require('formidable-serverless'); // Use formidable-serverless instead of formidable
+const fs = require('fs');
 
 exports.handler = async function(event, context) {
   console.log('Received event:', JSON.stringify(event, null, 2));
@@ -15,13 +15,11 @@ exports.handler = async function(event, context) {
     return { statusCode: 500, body: JSON.stringify({ error: 'Deepgram API key is not set' }) };
   }
 
-  // Handle multipart form data
-  if (event.headers['content-type'] && event.headers['content-type'].includes('multipart/form-data')) {
+  // Handle multipart form data using formidable-serverless
+  if (event.headers['content-type'].includes('multipart/form-data')) {
     try {
       const form = new formidable.IncomingForm();
-      form.keepExtensions = true; // Keeps file extensions
-      form.maxFileSize = 10 * 1024 * 1024; // Sets maximum file size to 10MB (adjust as needed)
-
+      
       // Parse the form data
       return new Promise((resolve, reject) => {
         form.parse(event, async (err, fields, files) => {
