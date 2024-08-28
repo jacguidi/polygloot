@@ -1,11 +1,10 @@
 const fetch = require('node-fetch');
-const formidable = require('formidable-serverless'); // Use formidable-serverless instead of formidable
-const fs = require('fs');
+const formidable = require('formidable-serverless'); // Use formidable-serverless for Netlify
+const fs = require('fs'); 
 
-exports.handler = async function(event, context) {
+exports.handler = async function (event) {
   console.log('Received event:', JSON.stringify(event, null, 2));
 
-  // Ensure the request is a POST request
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
@@ -15,12 +14,10 @@ exports.handler = async function(event, context) {
     return { statusCode: 500, body: JSON.stringify({ error: 'Deepgram API key is not set' }) };
   }
 
-  // Handle multipart form data using formidable-serverless
-  if (event.headers['content-type'].includes('multipart/form-data')) {
+  if (event.headers['content-type'] && event.headers['content-type'].includes('multipart/form-data')) {
     try {
-      const form = new formidable.IncomingForm();
-      
-      // Parse the form data
+      const form = formidable({ multiples: true });
+
       return new Promise((resolve, reject) => {
         form.parse(event, async (err, fields, files) => {
           if (err) {
@@ -32,7 +29,7 @@ exports.handler = async function(event, context) {
           }
 
           const action = fields.action;
-          const audioFile = files.file; // The uploaded audio file
+          const audioFile = files.file; 
 
           if (!audioFile || !action) {
             return resolve({
@@ -42,9 +39,8 @@ exports.handler = async function(event, context) {
           }
 
           try {
-            const audioBlob = await fs.promises.readFile(audioFile.filepath);
+            const audioBlob = await fs.promises.readFile(audioFile.path);
 
-            // Process the audio with Deepgram
             const result = await sendDeepgramRequest(audioBlob, deepgramApiKey);
             return resolve({
               statusCode: 200,
@@ -78,21 +74,17 @@ async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
   const url = 'https://api.deepgram.com/v1/listen';
 
   try {
-    console.log('Sending request to Deepgram API');
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Token ${deepgramApiKey}`,
-        'Content-Type': 'audio/wav', // Adjust based on your audio format
+        'Content-Type': 'audio/wav', 
       },
       body: audioBlob,
     });
 
     const contentType = response.headers.get('content-type');
-    console.log('Response Content-Type from Deepgram:', contentType);
-
     const responseBody = await response.text();
-    console.log('Raw Response from Deepgram:', responseBody);
 
     if (!response.ok) {
       throw new Error(`API request failed: ${response.status} ${response.statusText}. Response: ${responseBody}`);
@@ -102,11 +94,7 @@ async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
       throw new Error(`Expected JSON response but received: ${contentType}`);
     }
 
-    try {
-      return JSON.parse(responseBody);
-    } catch (jsonError) {
-      throw new Error(`Failed to parse JSON response: ${jsonError.message}. Response: ${responseBody}`);
-    }
+    return JSON.parse(responseBody);
   } catch (error) {
     console.error('Error in sendDeepgramRequest:', error.message);
     throw error;
