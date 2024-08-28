@@ -1,7 +1,8 @@
 const fetch = require('node-fetch');
+const formidable = require('formidable'); // Add formidable to handle form data
+const fs = require('fs'); // Add fs module to read files
 
 exports.handler = async function(event, context) {
-  // Log the incoming request for debugging
   console.log('Received event:', JSON.stringify(event, null, 2));
 
   // Ensure the request is a POST request
@@ -14,42 +15,63 @@ exports.handler = async function(event, context) {
     return { statusCode: 500, body: JSON.stringify({ error: 'Deepgram API key is not set' }) };
   }
 
-  let action = null;
+  // Handle multipart form data
+  if (event.headers['content-type'].includes('multipart/form-data')) {
+    try {
+      const form = new formidable.IncomingForm();
 
-  try {
-    console.log('Received event body:', event.body);
-    
-    // Log the incoming body to see if it's correctly formatted
-    const requestBody = JSON.parse(event.body);
-    action = requestBody.action;
-    const data = requestBody.data;
+      // Parse the form data
+      return new Promise((resolve, reject) => {
+        form.parse(event, async (err, fields, files) => {
+          if (err) {
+            console.error('Error parsing form data:', err);
+            return resolve({
+              statusCode: 400,
+              body: JSON.stringify({ error: 'Invalid form data' })
+            });
+          }
 
-    if (!data || typeof data !== 'object' || !data.audioBlob) {
-      throw new Error('Invalid input data: audioBlob is required and must be an object.');
+          const action = fields.action;
+          const audioFile = files.file; // The uploaded audio file
+
+          if (!audioFile || !action) {
+            return resolve({
+              statusCode: 400,
+              body: JSON.stringify({ error: 'Missing action or audio file' })
+            });
+          }
+
+          try {
+            const audioBlob = await fs.promises.readFile(audioFile.filepath);
+
+            // Process the audio with Deepgram
+            const result = await sendDeepgramRequest(audioBlob, deepgramApiKey);
+            return resolve({
+              statusCode: 200,
+              body: JSON.stringify(result)
+            });
+          } catch (error) {
+            console.error('Error processing audio:', error.message);
+            return resolve({
+              statusCode: 500,
+              body: JSON.stringify({ error: error.message || 'Internal Server Error' })
+            });
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Error handling multipart data:', error.message);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Internal Server Error' })
+      };
     }
-
-    const actionHandlers = {
-      transcribe: transcribeAudio,
-      detectContinuousSpeech: detectContinuousSpeech,
-    };
-
-    const handler = actionHandlers[action];
-    if (!handler) {
-      throw new Error('Invalid action: Action not recognized.');
-    }
-
-    const result = await handler(data, deepgramApiKey);
-    return {
-      statusCode: 200,
-      body: JSON.stringify(result),
-    };
-  } catch (error) {
-    console.error('Error processing action:', action, error.message);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message || 'Internal Server Error' }),
-    };
   }
+
+  return {
+    statusCode: 400,
+    body: JSON.stringify({ error: 'Unsupported Content-Type' })
+  };
 };
 
 async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
@@ -66,7 +88,6 @@ async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
       body: audioBlob,
     });
 
-    // Log the content type of the response
     const contentType = response.headers.get('content-type');
     console.log('Response Content-Type from Deepgram:', contentType);
 
@@ -77,7 +98,6 @@ async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
       throw new Error(`API request failed: ${response.status} ${response.statusText}. Response: ${responseBody}`);
     }
 
-    // Ensure content type is JSON before parsing
     if (!contentType || !contentType.includes('application/json')) {
       throw new Error(`Expected JSON response but received: ${contentType}`);
     }
@@ -91,25 +111,4 @@ async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
     console.error('Error in sendDeepgramRequest:', error.message);
     throw error;
   }
-}
-
-async function transcribeAudio({ audioBlob }, deepgramApiKey) {
-  const data = await sendDeepgramRequest(audioBlob, deepgramApiKey);
-  if (!data.results || !data.results.channels || !data.results.channels[0].alternatives[0].transcript) {
-    throw new Error('Transcription failed: Invalid response format from Deepgram.');
-  }
-  return { text: data.results.channels[0].alternatives[0].transcript };
-}
-
-async function detectContinuousSpeech({ audioBlob }, deepgramApiKey) {
-  const data = await sendDeepgramRequest(audioBlob, deepgramApiKey);
-  if (!data.results || !data.results.utterances) {
-    throw new Error('Continuous speech detection failed: Invalid response format from Deepgram.');
-  }
-  const utterances = data.results.utterances.map((utterance) => ({
-    start: utterance.start,
-    end: utterance.end,
-    transcript: utterance.transcript,
-  }));
-  return { utterances };
 }
