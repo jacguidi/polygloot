@@ -1,15 +1,16 @@
 const fetch = require('node-fetch');
 
 exports.handler = async function(event, context) {
-  if (!process.env.DEEPGRAM_API_KEY) {
-    console.error('DEEPGRAM_API_KEY is not set');
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Server configuration error' })
-    };
+  // Ensure the request is a POST request
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
 
   const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
+  if (!deepgramApiKey) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'Deepgram API key is not set' }) };
+  }
+
   let action = null;
 
   try {
@@ -41,28 +42,24 @@ exports.handler = async function(event, context) {
     console.error('Error processing action:', action, error.message);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
+      body: JSON.stringify({ error: error.message || 'Internal Server Error' }),
     };
   }
 };
 
 async function sendDeepgramRequest(audioBlob, deepgramApiKey) {
-  const url = new URL('https://api.deepgram.com/v1/listen');
-  url.searchParams.append('model', 'general');
-  url.searchParams.append('language', 'en-US');
+  const url = 'https://api.deepgram.com/v1/listen';
 
   try {
     console.log('Sending request to Deepgram API');
-    const response = await fetch(url.toString(), {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Token ${deepgramApiKey}`,
+        'Content-Type': 'audio/wav', // Adjust based on your audio format
       },
       body: audioBlob,
     });
-
-    console.log('Response Status:', response.status);
-    console.log('Response Headers:', JSON.stringify(response.headers.raw(), null, 2));
 
     const responseBody = await response.text();
     console.log('Raw Response from Deepgram:', responseBody);
