@@ -62,37 +62,40 @@ exports.handler = async function (event) {
 
       if (action === 'transcribe') {
         // Use Deepgram SDK's pre-recorded transcription feature
-        const response = await deepgram.transcription.preRecorded(
+        const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
+          source.buffer,
           {
-            buffer: source.buffer,
-            mimetype: source.mimetype
-          },
-          {
-            smart_format: true,
             model: model,
-            language: 'en-US'
           }
         );
 
-        console.log('Received response from Deepgram:', response);
+        if (error) {
+          console.error('Error from Deepgram:', error);
+          return {
+            statusCode: 500,
+            body: JSON.stringify({ error: 'Transcription failed', details: error })
+          };
+        }
+
+        console.log('Received response from Deepgram:', result);
 
         return {
           statusCode: 200,
-          body: JSON.stringify(response)
+          body: JSON.stringify(result)
         };
       } else if (action === 'stream') {
         // For real-time transcription, use Deepgram's streaming capabilities
-        const connection = await deepgram.transcription.live({
+        const dgConnection = deepgram.listen.live({
           model: model,
           language: 'en-US',
           smart_format: true
         });
 
-        connection.on(LiveTranscriptionEvents.Transcript, (data) => {
-          console.log('Live transcript:', data.channel.alternatives[0].transcript);
+        dgConnection.on(LiveTranscriptionEvents.Transcript, (data) => {
+          console.log('Live transcript:', data);
         });
 
-        connection.on(LiveTranscriptionEvents.Error, (err) => {
+        dgConnection.on(LiveTranscriptionEvents.Error, (err) => {
           console.error('Error:', err);
         });
 
@@ -100,7 +103,7 @@ exports.handler = async function (event) {
           .then((r) => r.body)
           .then((res) => {
             res.on('readable', () => {
-              connection.send(res.read());
+              dgConnection.send(res.read());
             });
           });
 
