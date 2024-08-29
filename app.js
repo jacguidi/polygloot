@@ -153,13 +153,12 @@ async function transcribeAudio(audioBlob) {
             body: formData
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Transcription failed: ${errorData.error}. ${errorData.details || ''}`);
-        }
-
         const data = await response.json();
         console.log('Received data from Deepgram:', data);
+
+        if (!response.ok) {
+            throw new Error(`Transcription failed: ${data.error}. Details: ${data.details || ''}`);
+        }
         
         if (data.transcript) {
             updateStatus(`Transcribed: ${data.transcript}`);
