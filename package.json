@@ -10,7 +10,8 @@
     "@deepgram/sdk": "^1.0.0",
     "cross-fetch": "^3.1.5",
     "dotenv": "^16.0.3",
-    "parse-multipart-data": "^1.0.4"
+    "parse-multipart-data": "^1.0.4",
+    "form-data": "^4.0.0"  // Add this line
   },
   "engines": {
     "node": "14.x"
