@@ -6,6 +6,11 @@ let statusDiv;
 let mediaRecorder;
 let audioChunks = [];
 let stream;
+let isRecording = false;
+let silenceTimer;
+let lastAudioTime = 0;
+
+const SILENCE_THRESHOLD = 1000; // 1 second of silence to trigger processing
 
 const languageToISO = {
     "English": "en",
@@ -46,13 +51,20 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     startButton.disabled = true;
-    startButton.onclick = startConversation;
+    startButton.onclick = toggleConversation;
 });
 
-// Function to update the status message
 function updateStatus(message) {
     statusDiv.textContent = message;
     console.log(message);
+}
+
+function toggleConversation() {
+    if (isRecording) {
+        stopConversation();
+    } else {
+        startConversation();
+    }
 }
 
 async function startConversation() {
@@ -73,17 +85,15 @@ async function startConversation() {
         
         mediaRecorder.ondataavailable = (event) => {
             audioChunks.push(event.data);
+            lastAudioTime = Date.now();
+            clearTimeout(silenceTimer);
+            silenceTimer = setTimeout(processSpeechSegment, SILENCE_THRESHOLD);
         };
 
-        mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
-            await processAudio(audioBlob, language1, language2);
-        };
-
-        mediaRecorder.start(1000);
+        mediaRecorder.start(100); // Capture in smaller chunks
+        isRecording = true;
         updateStatus(`Conversation started between ${ISOToLanguage[language1]} and ${ISOToLanguage[language2]}`);
         startButton.textContent = 'Stop Conversation';
-        startButton.onclick = stopConversation;
 
         stream.getTracks()[0].addEventListener('ended', stopConversation);
 
@@ -101,20 +111,38 @@ function stopConversation() {
         stream.getTracks().forEach(track => track.stop());
     }
     
+    clearTimeout(silenceTimer);
+    isRecording = false;
     mediaRecorder = null;
     stream = null;
     audioChunks = [];
     
     updateStatus('Conversation stopped');
     startButton.textContent = 'Start Conversation';
-    startButton.onclick = startConversation;
+}
+
+async function processSpeechSegment() {
+    if (audioChunks.length === 0) return;
+
+    const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
+    audioChunks = []; // Clear for next segment
+
+    const language1 = languageToISO[language1Select.options[language1Select.selectedIndex].text];
+    const language2 = languageToISO[language2Select.options[language2Select.selectedIndex].text];
+
+    await processAudio(audioBlob, language1, language2);
+
+    if (isRecording) {
+        // Continue recording for next segment
+        mediaRecorder.start(100);
+    }
 }
 
 async function transcribeAudio(audioBlob) {
     try {
         const formData = new FormData();
         formData.append('file', audioBlob, 'audio.webm');
-        formData.append('model', 'nova-2');  // Ensure this model is valid per SDK documentation
+        formData.append('model', 'nova-2');
         formData.append('action', 'transcribe');
 
         console.log('Sending request with:', 
@@ -135,7 +163,7 @@ async function transcribeAudio(audioBlob) {
         if (data.results && data.results.channels && data.results.channels[0].alternatives) {
             const transcript = data.results.channels[0].alternatives[0].transcript;
             updateStatus(`Transcribed: ${transcript}`);
-            transcribedTextElement.textContent = transcript;
+            transcribedTextElement.textContent += transcript + ' ';
             return transcript;
         } else {
             throw new Error('Unexpected response format from Deepgram API');
