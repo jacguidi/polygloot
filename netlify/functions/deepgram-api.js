@@ -62,11 +62,17 @@ exports.handler = async function (event) {
 
       if (action === 'transcribe') {
         // Use Deepgram SDK's pre-recorded transcription feature
-        const response = await deepgram.transcription.preRecorded(source, {
-          smart_format: true,
-          model: model,
-          language: 'en-US'
-        });
+        const response = await deepgram.transcription.preRecorded(
+          {
+            buffer: source.buffer,
+            mimetype: source.mimetype
+          },
+          {
+            smart_format: true,
+            model: model,
+            language: 'en-US'
+          }
+        );
 
         console.log('Received response from Deepgram:', response);
 
@@ -76,10 +82,10 @@ exports.handler = async function (event) {
         };
       } else if (action === 'stream') {
         // For real-time transcription, use Deepgram's streaming capabilities
-        const connection = deepgram.listen.live({
+        const connection = await deepgram.transcription.live({
           model: model,
           language: 'en-US',
-          smart_format: true,
+          smart_format: true
         });
 
         connection.on(LiveTranscriptionEvents.Transcript, (data) => {
