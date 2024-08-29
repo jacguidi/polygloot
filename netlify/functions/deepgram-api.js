@@ -12,7 +12,7 @@ exports.handler = async function (event) {
   const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
   if (!deepgramApiKey) {
     console.error('Deepgram API key is not set');
-    return { statusCode: 500, body: JSON.stringify({ error: 'Deepgram API key is not set' }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Server configuration error' }) };
   }
 
   const deepgram = createClient(deepgramApiKey);
@@ -29,7 +29,7 @@ exports.handler = async function (event) {
       const fileMimeType = parts.find(part => part.name === 'file')?.type || 'audio/webm';
 
       if (!audioFile || !action) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Missing action or audio file' }) };
+        return { statusCode: 400, body: JSON.stringify({ error: 'Missing audio file or action' }) };
       }
 
       const source = {
@@ -38,24 +38,43 @@ exports.handler = async function (event) {
       };
 
       if (action === 'transcribe') {
-        // For chunk-based transcription
-        const response = await deepgram.listen.prerecorded.transcribeFile(source, {
-          smart_format: true,
-          model: model,
-          language: 'en-US',
-          utterances: true  // This enables speaker segmentation
-        });
+        try {
+          const response = await deepgram.listen.prerecorded.transcribeFile(source, {
+            smart_format: true,
+            model: model,
+            language: 'en-US'
+          });
 
-        return { statusCode: 200, body: JSON.stringify(response) };
-      } else if (action === 'stream') {
-        // For real-time streaming (if needed in the future)
-        // Note: This part would need to be handled differently, possibly with WebSockets
-        return { statusCode: 200, body: JSON.stringify({ message: 'Streaming not implemented in this endpoint' }) };
+          console.log('Deepgram response:', JSON.stringify(response, null, 2));
+
+          if (response && response.results && response.results.channels && response.results.channels[0].alternatives) {
+            const transcript = response.results.channels[0].alternatives[0].transcript;
+            return { 
+              statusCode: 200, 
+              body: JSON.stringify({ 
+                transcript: transcript,
+                fullResponse: response  // Include full response for debugging
+              }) 
+            };
+          } else {
+            throw new Error('Unexpected response structure from Deepgram API');
+          }
+        } catch (deepgramError) {
+          console.error('Deepgram API error:', deepgramError);
+          return { 
+            statusCode: 500, 
+            body: JSON.stringify({ 
+              error: 'Deepgram API error', 
+              details: deepgramError.message,
+              fullError: JSON.stringify(deepgramError)  // Include full error for debugging
+            }) 
+          };
+        }
       } else {
         return { statusCode: 400, body: JSON.stringify({ error: 'Unsupported action' }) };
       }
     } catch (error) {
-      console.error('Error handling multipart data:', error.message);
+      console.error('Error processing request:', error);
       return { statusCode: 500, body: JSON.stringify({ error: 'Internal Server Error', details: error.message }) };
     }
   }
