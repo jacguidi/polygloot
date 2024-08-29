@@ -32,6 +32,9 @@ exports.handler = async function (event) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Missing audio file or action' }) };
       }
 
+      console.log('Audio file size:', audioFile.length);
+      console.log('Audio file type:', fileMimeType);
+
       const source = {
         buffer: audioFile,
         mimetype: fileMimeType
@@ -39,7 +42,7 @@ exports.handler = async function (event) {
 
       if (action === 'transcribe') {
         try {
-          const response = await deepgram.listen.prerecorded.transcribeFile(source, {
+          const response = await deepgram.transcription.preRecorded(source, {
             smart_format: true,
             model: model,
             language: 'en-US'
@@ -51,10 +54,7 @@ exports.handler = async function (event) {
             const transcript = response.results.channels[0].alternatives[0].transcript;
             return { 
               statusCode: 200, 
-              body: JSON.stringify({ 
-                transcript: transcript,
-                fullResponse: response
-              }) 
+              body: JSON.stringify({ transcript: transcript }) 
             };
           } else {
             throw new Error('Unexpected response structure from Deepgram API');
@@ -65,8 +65,7 @@ exports.handler = async function (event) {
             statusCode: 500, 
             body: JSON.stringify({ 
               error: 'Deepgram API error', 
-              details: deepgramError.message,
-              fullError: JSON.stringify(deepgramError)
+              details: deepgramError.message
             }) 
           };
         }
