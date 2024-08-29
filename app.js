@@ -154,8 +154,8 @@ async function transcribeAudio(audioBlob) {
         });
 
         if (!response.ok) {
-            const errorBody = await response.text();
-            throw new Error(`Transcription failed: ${response.status} ${response.statusText}. ${errorBody}`);
+            const errorData = await response.json();
+            throw new Error(`Transcription failed: ${errorData.error}. ${errorData.details || ''}`);
         }
 
         const data = await response.json();
@@ -163,10 +163,8 @@ async function transcribeAudio(audioBlob) {
         
         if (data.transcript) {
             updateStatus(`Transcribed: ${data.transcript}`);
-            transcribedTextElement.textContent = data.transcript;
+            transcribedTextElement.textContent += data.transcript + ' ';
             return data.transcript;
-        } else if (data.error) {
-            throw new Error(`API Error: ${data.error}. Details: ${data.details}`);
         } else {
             throw new Error('Unexpected response format from Deepgram API');
         }
