@@ -1,7 +1,7 @@
-const { createClient, LiveTranscriptionEvents } = require('@deepgram/sdk');
+const { Deepgram } = require('@deepgram/sdk'); // Updated import
 const multipart = require('parse-multipart-data');
 const { Buffer } = require('buffer');
-const fetch = require('cross-fetch'); // For fetching the audio stream
+const fetch = require('cross-fetch');
 require('dotenv').config(); // Load environment variables from .env file
 
 exports.handler = async function (event) {
@@ -20,7 +20,7 @@ exports.handler = async function (event) {
   }
 
   // Initialize Deepgram client
-  const deepgram = createClient(deepgramApiKey);
+  const deepgram = new Deepgram(deepgramApiKey); // Corrected initialization
 
   // Check for content-type header
   if (event.headers['content-type'] && event.headers['content-type'].includes('multipart/form-data')) {
@@ -105,7 +105,10 @@ exports.handler = async function (event) {
           .then((r) => r.body)
           .then((res) => {
             res.on('readable', () => {
-              connection.send(res.read());
+              const chunk = res.read();
+              if (chunk) {
+                connection.send(chunk);
+              }
             });
           });
 
