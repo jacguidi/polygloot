@@ -160,11 +160,13 @@ async function transcribeAudio(audioBlob) {
 
         const data = await response.json();
         console.log('Received data from Deepgram:', data);
-        if (data.results && data.results.channels && data.results.channels[0].alternatives) {
-            const transcript = data.results.channels[0].alternatives[0].transcript;
-            updateStatus(`Transcribed: ${transcript}`);
-            transcribedTextElement.textContent += transcript + ' ';
-            return transcript;
+        
+        if (data.transcript) {
+            updateStatus(`Transcribed: ${data.transcript}`);
+            transcribedTextElement.textContent = data.transcript;
+            return data.transcript;
+        } else if (data.error) {
+            throw new Error(`API Error: ${data.error}. Details: ${data.details}`);
         } else {
             throw new Error('Unexpected response format from Deepgram API');
         }
