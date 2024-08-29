@@ -114,7 +114,7 @@ async function transcribeAudio(audioBlob) {
     try {
         const formData = new FormData();
         formData.append('file', audioBlob, 'audio.webm');
-        formData.append('model', 'general');
+        formData.append('model', 'nova-2');
         formData.append('action', 'transcribe');
 
         console.log('Sending request with:', 
@@ -131,7 +131,7 @@ async function transcribeAudio(audioBlob) {
         }
 
         const data = await response.json();
-        console.log('Received data from Deepgram:', data);  // Add this line for debugging
+        console.log('Received data from Deepgram:', data);
         if (data.results && data.results.channels && data.results.channels[0].alternatives) {
             const transcript = data.results.channels[0].alternatives[0].transcript;
             updateStatus(`Transcribed: ${transcript}`);
