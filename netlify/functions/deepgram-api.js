@@ -21,7 +21,6 @@ exports.handler = async function (event) {
       const bodyBuffer = Buffer.from(event.body, 'base64');
       const boundary = multipart.getBoundary(event.headers['content-type']);
       const parts = multipart.parse(bodyBuffer, boundary);
-
       console.log('Parsed parts:', parts.map(part => ({ name: part.name, dataLength: part.data ? part.data.length : 0 })));
 
       let audioFile, action, model;
@@ -36,6 +35,7 @@ exports.handler = async function (event) {
       }
 
       console.log('Audio file present:', !!audioFile);
+      console.log('Audio file size:', audioFile ? audioFile.length : 0);
       console.log('Action:', action);
       console.log('Model:', model);
 
@@ -50,7 +50,6 @@ exports.handler = async function (event) {
       console.log('Sending request to Deepgram');
       const result = await sendDeepgramRequest(audioFile, deepgramApiKey, model);
       console.log('Received response from Deepgram');
-
       return {
         statusCode: 200,
         body: JSON.stringify(result)
@@ -75,19 +74,23 @@ async function sendDeepgramRequest(audioBlob, deepgramApiKey, model) {
   const url = 'https://api.deepgram.com/v1/listen?model=' + (model || 'general');
   try {
     console.log('Sending request to Deepgram API');
+    console.log('Audio blob size:', audioBlob.length);
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Token ${deepgramApiKey}`,
-        'Content-Type': 'audio/webm; codecs=opus', // Corrected content type
+        'Content-Type': 'audio/webm;codecs=opus',
       },
       body: audioBlob,
     });
-    console.log('Received response from Deepgram API');
 
+    console.log('Received response from Deepgram API');
+    console.log('Response status:', response.status);
     const contentType = response.headers.get('content-type');
-    const responseBody = await response.text();
     console.log('Response content type:', contentType);
+
+    const responseBody = await response.text();
     console.log('Response body:', responseBody);
 
     if (!response.ok) {
