@@ -2,9 +2,9 @@
   "name": "deepgram-transcription",
   "version": "1.0.0",
   "description": "A project to transcribe audio using the Deepgram API",
-  "main": "deepgram-api.js",
+  "main": "netlify/functions/deepgram-api.js",
   "scripts": {
-    "start": "node deepgram-api.js"
+    "start": "node netlify/functions/deepgram-api.js"
   },
   "dependencies": {
     "@deepgram/sdk": "^1.0.0",
