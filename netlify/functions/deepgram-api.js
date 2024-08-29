@@ -1,4 +1,4 @@
-const fetch = require('node-fetch');
+const { Deepgram } = require('@deepgram/sdk');
 const multipart = require('parse-multipart-data');
 const { Buffer } = require('buffer');
 
@@ -12,6 +12,9 @@ exports.handler = async function (event) {
     console.error('Deepgram API key is not set');
     return { statusCode: 500, body: JSON.stringify({ error: 'Deepgram API key is not set' }) };
   }
+
+  const deepgram = new Deepgram(deepgramApiKey);
+
   if (event.headers['content-type'] && event.headers['content-type'].includes('multipart/form-data')) {
     try {
       console.log('Parsing multipart form data');
@@ -19,6 +22,7 @@ exports.handler = async function (event) {
       const boundary = multipart.getBoundary(event.headers['content-type']);
       const parts = multipart.parse(bodyBuffer, boundary);
       console.log('Parsed parts:', parts.map(part => ({ name: part.name, dataLength: part.data ? part.data.length : 0 })));
+      
       let audioFile, action, model;
       for (const part of parts) {
         if (part.name === 'file') {
@@ -29,9 +33,11 @@ exports.handler = async function (event) {
           model = part.data.toString();
         }
       }
+      
       console.log('Audio file present:', !!audioFile);
       console.log('Action:', action);
       console.log('Model:', model);
+      
       if (!audioFile || !action) {
         console.error('Missing action or audio file');
         return {
@@ -39,12 +45,23 @@ exports.handler = async function (event) {
           body: JSON.stringify({ error: 'Missing action or audio file' })
         };
       }
+
       console.log('Sending request to Deepgram');
-      const result = await sendDeepgramRequest(audioFile, deepgramApiKey, model);
+      const source = {
+        buffer: audioFile,
+        mimetype: 'audio/webm'
+      };
+
+      const response = await deepgram.transcription.preRecorded(source, {
+        smart_format: true,
+        model: model || 'nova-2',
+        language: 'en-US'
+      });
+
       console.log('Received response from Deepgram');
       return {
         statusCode: 200,
-        body: JSON.stringify(result)
+        body: JSON.stringify(response)
       };
     } catch (error) {
       console.error('Error handling multipart data:', error);
@@ -54,39 +71,10 @@ exports.handler = async function (event) {
       };
     }
   }
+  
   console.error('Unsupported Content-Type');
   return {
     statusCode: 400,
     body: JSON.stringify({ error: 'Unsupported Content-Type' })
   };
 };
-
-async function sendDeepgramRequest(audioBlob, deepgramApiKey, model) {
-  const url = 'https://api.deepgram.com/v1/listen?model=' + (model || 'general');
-  try {
-    console.log('Sending request to Deepgram API');
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${deepgramApiKey}`,
-        'Content-Type': 'audio/webm',  // Remove '; codecs=opus'
-      },
-      body: audioBlob,
-    });
-    console.log('Received response from Deepgram API');
-    const contentType = response.headers.get('content-type');
-    const responseBody = await response.text();
-    console.log('Response content type:', contentType);
-    console.log('Response body:', responseBody);
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}. Response: ${responseBody}`);
-    }
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error(`Expected JSON response but received: ${contentType}`);
-    }
-    return JSON.parse(responseBody);
-  } catch (error) {
-    console.error('Error in sendDeepgramRequest:', error);
-    throw error;
-  }
-}
