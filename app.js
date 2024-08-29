@@ -1,14 +1,15 @@
+import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
+
 let startButton;
 let language1Select;
 let language2Select;
 let transcribedTextElement;
 let statusDiv;
 let mediaRecorder;
-let audioChunks = [];
 let stream;
 let isRecording = false;
+let live; // Deepgram live client
 let silenceTimer;
-let lastAudioTime = 0;
 
 const SILENCE_THRESHOLD = 1000; // 1 second of silence to trigger processing
 
@@ -76,6 +77,7 @@ async function startConversation() {
     if (transcribedTextElement) {
         transcribedTextElement.textContent = ''; 
     }
+
     const language1 = languageToISO[language1Select.options[language1Select.selectedIndex].text];
     const language2 = languageToISO[language2Select.options[language2Select.selectedIndex].text];
     
@@ -84,11 +86,31 @@ async function startConversation() {
         mediaRecorder = new MediaRecorder(stream);
         
         mediaRecorder.ondataavailable = (event) => {
-            audioChunks.push(event.data);
-            lastAudioTime = Date.now();
-            clearTimeout(silenceTimer);
-            silenceTimer = setTimeout(processSpeechSegment, SILENCE_THRESHOLD);
+            if (event.data.size > 0 && live) {
+                live.send(event.data); // Send audio data to Deepgram WebSocket
+            }
         };
+
+        // Initialize Deepgram client for live transcription
+        const deepgram = createClient(process.env.DEEPGRAM_API_KEY); // Backend environment variable access
+        live = deepgram.listen.live({ model: 'nova-2' });
+
+        live.on(LiveTranscriptionEvents.Open, () => {
+            console.log('WebSocket connection opened');
+        });
+
+        live.on(LiveTranscriptionEvents.Transcript, (data) => {
+            const transcript = data.channel.alternatives[0].transcript;
+            if (transcript) {
+                transcribedTextElement.textContent += transcript + ' ';
+                processTranscription(transcript, language1, language2);
+            }
+        });
+
+        live.on(LiveTranscriptionEvents.Error, (error) => {
+            console.error('Transcription error:', error);
+            updateStatus(`Transcription error: ${error.message}`);
+        });
 
         mediaRecorder.start(100); // Capture in smaller chunks
         isRecording = true;
@@ -111,6 +133,10 @@ function stopConversation() {
         stream.getTracks().forEach(track => track.stop());
     }
     
+    if (live) {
+        live.finish(); // Close the WebSocket connection
+    }
+
     clearTimeout(silenceTimer);
     isRecording = false;
     mediaRecorder = null;
@@ -121,62 +147,8 @@ function stopConversation() {
     startButton.textContent = 'Start Conversation';
 }
 
-async function processSpeechSegment() {
-    if (audioChunks.length === 0) return;
-
-    const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
-    audioChunks = []; // Clear for next segment
-
-    const language1 = languageToISO[language1Select.options[language1Select.selectedIndex].text];
-    const language2 = languageToISO[language2Select.options[language2Select.selectedIndex].text];
-
-    await processAudio(audioBlob, language1, language2);
-
-    if (isRecording) {
-        // Continue recording for next segment
-        mediaRecorder.start(100);
-    }
-}
-
-async function transcribeAudio(audioBlob) {
+async function processTranscription(transcribedText, language1, language2) {
     try {
-        const formData = new FormData();
-        formData.append('file', audioBlob, 'audio.webm');
-        formData.append('model', 'nova-2');
-        formData.append('action', 'transcribe');
-
-        console.log('Sending request with:', 
-            Array.from(formData.entries()).map(e => `${e[0]}: ${e[1] instanceof Blob ? 'Blob' : e[1]}`));
-
-        const response = await fetch('/.netlify/functions/deepgram-api', {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-        console.log('Received data from Deepgram:', data);
-
-        if (!response.ok) {
-            throw new Error(`Transcription failed: ${data.error}. Details: ${data.details || ''}`);
-        }
-        
-        if (data.transcript) {
-            updateStatus(`Transcribed: ${data.transcript}`);
-            transcribedTextElement.textContent += data.transcript + ' ';
-            return data.transcript;
-        } else {
-            throw new Error('Unexpected response format from Deepgram API');
-        }
-    } catch (error) {
-        console.error('Transcription error:', error);
-        updateStatus(`Transcription error: ${error.message}`);
-        throw error;
-    }
-}
-
-async function processAudio(audioBlob, language1, language2) {
-    try {
-        let transcribedText = await transcribeAudio(audioBlob);
         let detectedLanguage = await detectLanguage(transcribedText);
 
         if (detectedLanguage !== language1 && detectedLanguage !== language2) {
@@ -188,7 +160,7 @@ async function processAudio(audioBlob, language1, language2) {
         await generateSpeech(translatedText, targetLanguage);
 
     } catch (error) {
-        updateStatus(`Error processing audio: ${error.message}`);
+        updateStatus(`Error processing transcription: ${error.message}`);
     }
 }
 
