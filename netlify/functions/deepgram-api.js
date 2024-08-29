@@ -53,7 +53,7 @@ exports.handler = async function (event) {
               statusCode: 200, 
               body: JSON.stringify({ 
                 transcript: transcript,
-                fullResponse: response  // Include full response for debugging
+                fullResponse: response
               }) 
             };
           } else {
@@ -66,7 +66,7 @@ exports.handler = async function (event) {
             body: JSON.stringify({ 
               error: 'Deepgram API error', 
               details: deepgramError.message,
-              fullError: JSON.stringify(deepgramError)  // Include full error for debugging
+              fullError: JSON.stringify(deepgramError)
             }) 
           };
         }
