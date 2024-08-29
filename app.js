@@ -114,7 +114,7 @@ async function transcribeAudio(audioBlob) {
     try {
         const formData = new FormData();
         formData.append('file', audioBlob, 'audio.webm');
-        formData.append('model', 'nova-2');
+        formData.append('model', 'nova-2');  // Ensure this model is valid per SDK documentation
         formData.append('action', 'transcribe');
 
         console.log('Sending request with:', 
