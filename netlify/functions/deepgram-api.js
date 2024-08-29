@@ -1,6 +1,6 @@
-const { createClient } = require('@deepgram/sdk');
-const multipart = require('parse-multipart-data');
-const { Buffer } = require('buffer');
+import { createClient } from '@deepgram/sdk';
+import multipart from 'parse-multipart-data';
+import { Buffer } from 'buffer';
 
 exports.handler = async function (event) {
   console.log('Received event:', JSON.stringify(event, null, 2));
@@ -42,7 +42,7 @@ exports.handler = async function (event) {
 
       if (action === 'transcribe') {
         try {
-          const response = await deepgram.transcription.preRecorded(source, {
+          const response = await deepgram.transcribe(source, {
             smart_format: true,
             model: model,
             language: 'en-US'
