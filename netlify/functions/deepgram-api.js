@@ -39,9 +39,14 @@ exports.handler = async function (event) {
       const action = parts.find(part => part.name === 'action')?.data.toString();
       const model = parts.find(part => part.name === 'model')?.data.toString() || 'nova-2';
 
+      // Extract the file type (mimetype) from the file part, if available
+      const fileMimeType = parts.find(part => part.name === 'file')?.type || 'audio/wav'; // Default to wav if not specified
+
       console.log('Audio file present:', !!audioFile);
       console.log('Action:', action);
       console.log('Model:', model);
+      console.log('File type detected:', fileMimeType);
+      console.log('Buffer size:', audioFile?.length);
 
       // Validate presence of required data
       if (!audioFile || !action) {
@@ -57,45 +62,42 @@ exports.handler = async function (event) {
       // Prepare the audio source for Deepgram API
       const source = {
         buffer: audioFile,
-        mimetype: 'audio/webm'  // Adjust mimetype based on your actual file type
+        mimetype: fileMimeType // Use dynamically detected mimetype
       };
 
       if (action === 'transcribe') {
         // Use Deepgram SDK's pre-recorded transcription feature
-        const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
-          source.buffer,
+        const response = await deepgram.transcription.preRecorded(
           {
+            buffer: source.buffer,
+            mimetype: source.mimetype
+          },
+          {
+            smart_format: true,
             model: model,
+            language: 'en-US'
           }
         );
 
-        if (error) {
-          console.error('Error from Deepgram:', error);
-          return {
-            statusCode: 500,
-            body: JSON.stringify({ error: 'Transcription failed', details: error })
-          };
-        }
-
-        console.log('Received response from Deepgram:', result);
+        console.log('Received response from Deepgram:', response);
 
         return {
           statusCode: 200,
-          body: JSON.stringify(result)
+          body: JSON.stringify(response)
         };
       } else if (action === 'stream') {
         // For real-time transcription, use Deepgram's streaming capabilities
-        const dgConnection = deepgram.listen.live({
+        const connection = await deepgram.transcription.live({
           model: model,
           language: 'en-US',
           smart_format: true
         });
 
-        dgConnection.on(LiveTranscriptionEvents.Transcript, (data) => {
-          console.log('Live transcript:', data);
+        connection.on(LiveTranscriptionEvents.Transcript, (data) => {
+          console.log('Live transcript:', data.channel.alternatives[0].transcript);
         });
 
-        dgConnection.on(LiveTranscriptionEvents.Error, (err) => {
+        connection.on(LiveTranscriptionEvents.Error, (err) => {
           console.error('Error:', err);
         });
 
@@ -103,7 +105,7 @@ exports.handler = async function (event) {
           .then((r) => r.body)
           .then((res) => {
             res.on('readable', () => {
-              dgConnection.send(res.read());
+              connection.send(res.read());
             });
           });
 
