@@ -9,6 +9,7 @@ exports.handler = async function (event) {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
 
+  // Use Netlify environment variable for the Deepgram API key
   const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
   if (!deepgramApiKey) {
     console.error('Deepgram API key is not set');
@@ -42,7 +43,7 @@ exports.handler = async function (event) {
 
       if (action === 'transcribe') {
         try {
-          const response = await deepgram.transcribe(source, {
+          const response = await deepgram.transcription.preRecorded(source, {
             smart_format: true,
             model: model,
             language: 'en-US'
