@@ -131,6 +131,7 @@ async function transcribeAudio(audioBlob) {
         }
 
         const data = await response.json();
+        console.log('Received data from Deepgram:', data);  // Add this line for debugging
         if (data.results && data.results.channels && data.results.channels[0].alternatives) {
             const transcript = data.results.channels[0].alternatives[0].transcript;
             updateStatus(`Transcribed: ${transcript}`);
