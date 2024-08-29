@@ -1,11 +1,15 @@
 {
-  "name": "polygloot",
+  "name": "deepgram-transcription",
   "version": "1.0.0",
+  "description": "A project to transcribe audio using the Deepgram API",
+  "main": "deepgram-api.js",
+  "scripts": {
+    "start": "node deepgram-api.js"
+  },
   "dependencies": {
-    "node-fetch": "^2.6.1",
-    "form-data": "^4.0.0",
-    "axios": "^1.7.4",
-    "parse-multipart-data": "^1.5.0",
-    "@deepgram/sdk": "^2.4.0"
+    "@deepgram/sdk": "^1.0.0",
+    "cross-fetch": "^3.1.5",
+    "dotenv": "^16.0.3",
+    "parse-multipart-data": "^1.0.4"
   }
 }
