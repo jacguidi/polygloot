@@ -288,6 +288,7 @@ footer {
     </div>
 
     <!-- disclaimer popup -->
+    <!-- disclaimer popup -->
 <div id="disclaimerPopup" class="popup">
     <div class="popup-content">
         <h2>Welcome to Polygloot, your Personal Interpreter! 🌍🗣️</h2>
@@ -295,13 +296,13 @@ footer {
         <h3>Quick tips before you start:</h3>
         <ul>
             <li>Polygloot is clever, but not perfect, so expect the occasional mix-up! If it doesn't get it right, just repeat</li>
-            <li>Speak for 4-5 seconds, then wait for the translation to happen.</li>
+            <li>Speak for at least 4-5 seconds - it helps the AI understand you better.</li>
             <li>For important stuff like legal or medical talk, please use a professional interpreter, if available.</li>
         </ul>
         <p>By using this service, you agree to our <a href="privacy-policy.html" target="_blank">Privacy Policy</a>.</p>
         <label>
             <input type="checkbox" id="understandCheckbox">
-            I understand and I'm ready to start the conversation!
+            I understand and I'm ready to chat in any language!
         </label>
         <div class="button-container">
             <button id="acceptButton" disabled>Start Chatting</button>
@@ -309,7 +310,8 @@ footer {
     </div>
 </div>
 
-        <script src="app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hark@1.2.3/hark.bundle.min.js"></script>
+    <script src="app.js"></script>
 
     <footer>
     <p>&copy; 2024 Polygloot. <a href="privacy-policy.html">Privacy Policy</a></p>
