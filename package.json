@@ -1,21 +1,8 @@
 {
-  "name": "deepgram-transcription",
+  "name": "polygloot",
   "version": "1.0.0",
-  "description": "A project to transcribe audio using the Deepgram API",
-  "main": "netlify/functions/deepgram-api.js",
-  "scripts": {
-    "start": "node netlify/functions/deepgram-api.js"
-  },
   "dependencies": {
-    "@deepgram/sdk": "^3.5.1",
-    "axios": "^1.7.4",
-    "cross-fetch": "^3.1.5",
-    "dotenv": "^16.0.3",
-    "parse-multipart-data": "^1.0.4",
-    "form-data": "^4.0.0",
-    "node-fetch": "^2.6.1"
-  },
-  "engines": {
-    "node": "14.x"
+    "node-fetch": "^2.6.1",
+    "form-data": "^4.0.0"
   }
 }
