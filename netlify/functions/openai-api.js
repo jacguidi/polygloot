@@ -2,7 +2,6 @@ const fetch = require('node-fetch');
 const FormData = require('form-data');
 
 const apiKey = process.env.OPENAI_API_KEY;
-const apiBaseUrl = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1';
 
 exports.handler = async function(event, context) {
   const { action, data } = JSON.parse(event.body);
@@ -10,6 +9,9 @@ exports.handler = async function(event, context) {
   try {
     let result;
     switch (action) {
+      case 'transcribe':
+        result = await transcribeAudio(data);
+        break;
       case 'detectLanguage':
         result = await detectLanguage(data);
         break;
@@ -28,82 +30,125 @@ exports.handler = async function(event, context) {
 
     return {
       statusCode: 200,
-      body: JSON.stringify(result),
+      body: JSON.stringify(result)
     };
   } catch (error) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: `Error in ${action}: ${error.message}` }),
+      body: JSON.stringify({ error: error.message })
     };
   }
 };
 
-async function makeOpenAIRequest(endpoint, body) {
-  const response = await fetch(`${apiBaseUrl}/${endpoint}`, {
+async function transcribeAudio(base64Audio) {
+  const formData = new FormData();
+  const buffer = Buffer.from(base64Audio, 'base64');
+  formData.append('file', buffer, { filename: 'audio.wav' });
+  formData.append('model', 'whisper-1');
+  formData.append('response_format', 'json');
+
+  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
+      ...formData.getHeaders()
     },
-    body: JSON.stringify(body),
+    body: formData
   });
 
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+    throw new Error(`Transcription failed: ${response.status} ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  return { text: data.text };
 }
 
 async function detectLanguage(text) {
-  const data = await makeOpenAIRequest('chat/completions', {
-    model: 'gpt-4',
-    messages: [
-      { role: 'system', content: 'You are a language detection tool. Respond only with the ISO 639-1 code of the language of the given text.' },
-      { role: 'user', content: text },
-    ],
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4',
+      messages: [
+        { role: 'system', content: 'You are a language detection tool. Respond only with the ISO 639-1 code of the language of the given text.' },
+        { role: 'user', content: text }
+      ]
+    })
   });
 
+  if (!response.ok) {
+    throw new Error(`Language detection failed: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
   return { detectedLanguage: data.choices[0].message.content.trim().toLowerCase() };
 }
 
 async function translateText(text, sourceLanguage, targetLanguage) {
-  const data = await makeOpenAIRequest('chat/completions', {
-    model: 'gpt-4',
-    messages: [
-      { role: 'system', content: `You are a professional translator. Translate the following text from ${sourceLanguage} to ${targetLanguage}.` },
-      { role: 'user', content: text },
-    ],
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4',
+      messages: [
+        { role: 'system', content: `You are a professional translator. Translate the following text from ${sourceLanguage} to ${targetLanguage}. Translate only the provided text, do not add any additional content or commentary.` },
+        { role: 'user', content: text }
+      ]
+    })
   });
 
+  if (!response.ok) {
+    throw new Error(`Translation failed: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
   return { translatedText: data.choices[0].message.content };
 }
 
 async function validateTranslation(originalText, translatedText, sourceLanguage, targetLanguage) {
-  const data = await makeOpenAIRequest('chat/completions', {
-    model: 'gpt-4',
-    messages: [
-      { role: 'system', content: `You are a translation validator. Compare the original text and its translation. Correct the translation if necessary.` },
-      { role: 'user', content: `Original (${sourceLanguage}): ${originalText}\nTranslation (${targetLanguage}): ${translatedText}` },
-    ],
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4',
+      messages: [
+        { role: 'system', content: `You are a translation validator. Compare the original text and its translation. If the translation contains any additional content not present in the original, remove it. Only return the corrected translation.` },
+        { role: 'user', content: `Original (${sourceLanguage}): ${originalText}\nTranslation (${targetLanguage}): ${translatedText}` }
+      ]
+    })
   });
 
+  if (!response.ok) {
+    throw new Error(`Translation validation failed: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
   return { validatedTranslation: data.choices[0].message.content };
 }
 
 async function generateSpeech(text, language, voice) {
-  const response = await fetch(`${apiBaseUrl}/audio/speech`, {
+  const response = await fetch('https://api.openai.com/v1/audio/speech', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
       model: 'tts-1',
       input: text,
       voice: voice,
-      language: language,
-    }),
+      language: language
+    })
   });
 
   if (!response.ok) {
@@ -111,5 +156,6 @@ async function generateSpeech(text, language, voice) {
   }
 
   const audioBuffer = await response.arrayBuffer();
-  return { audio: Buffer.from(audioBuffer).toString('base64') };
+  const base64Audio = Buffer.from(audioBuffer).toString('base64');
+  return { audio: base64Audio };
 }
