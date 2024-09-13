@@ -33,6 +33,7 @@ exports.handler = async function(event, context) {
       body: JSON.stringify(result)
     };
   } catch (error) {
+    console.error('Error in handler:', error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message })
@@ -57,7 +58,8 @@ async function transcribeAudio(base64Audio) {
   });
 
   if (!response.ok) {
-    throw new Error(`Transcription failed: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Transcription failed: ${response.status} ${response.statusText}. ${errorText}`);
   }
 
   const data = await response.json();
@@ -81,7 +83,8 @@ async function detectLanguage(text) {
   });
 
   if (!response.ok) {
-    throw new Error(`Language detection failed: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Language detection failed: ${response.status} ${response.statusText}. ${errorText}`);
   }
 
   const data = await response.json();
@@ -105,7 +108,8 @@ async function translateText(text, sourceLanguage, targetLanguage) {
   });
 
   if (!response.ok) {
-    throw new Error(`Translation failed: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Translation failed: ${response.status} ${response.statusText}. ${errorText}`);
   }
 
   const data = await response.json();
@@ -129,7 +133,8 @@ async function validateTranslation(originalText, translatedText, sourceLanguage,
   });
 
   if (!response.ok) {
-    throw new Error(`Translation validation failed: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Translation validation failed: ${response.status} ${response.statusText}. ${errorText}`);
   }
 
   const data = await response.json();
@@ -137,25 +142,72 @@ async function validateTranslation(originalText, translatedText, sourceLanguage,
 }
 
 async function generateSpeech(text, language, voice) {
-  const response = await fetch('https://api.openai.com/v1/audio/speech', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'tts-1',
-      input: text,
-      voice: voice,
-      language: language
-    })
-  });
+  try {
+    // Adjust the language code if necessary
+    const languageCode = getOpenAILanguageCode(language);
 
-  if (!response.ok) {
-    throw new Error(`Speech generation failed: ${response.status} ${response.statusText}`);
+    // Prepare the request payload
+    const payload = {
+      input: {
+        text: text
+      },
+      voice: {
+        language_code: languageCode,
+        name: voice || getDefaultVoiceName(languageCode),
+        ssml_gender: 'NEUTRAL'
+      },
+      audio_config: {
+        audio_encoding: 'LINEAR16' // WAV format
+      }
+    };
+
+    // Call OpenAI's Text-to-Speech API
+    const response = await fetch('https://api.openai.com/v1/audio/synthesize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Speech generation failed: ${response.status} ${response.statusText}. ${errorText}`);
+    }
+
+    const data = await response.json();
+
+    // The API returns audio content in base64
+    const base64Audio = data.audio_content;
+
+    return { audio: base64Audio };
+  } catch (error) {
+    console.error('Error generating speech:', error);
+    throw new Error(`Speech generation failed: ${error.message}`);
   }
+}
 
-  const audioBuffer = await response.arrayBuffer();
-  const base64Audio = Buffer.from(audioBuffer).toString('base64');
-  return { audio: base64Audio };
+// Helper function to map ISO codes to OpenAI language codes
+function getOpenAILanguageCode(isoCode) {
+  const languageMap = {
+    'en': 'en-US',
+    'it': 'it-IT',
+    'fr': 'fr-FR',
+    'tr': 'tr-TR',
+    'es': 'es-ES'
+  };
+  return languageMap[isoCode] || 'en-US';
+}
+
+// Helper function to get default voice names
+function getDefaultVoiceName(languageCode) {
+  const voiceMap = {
+    'en-US': 'en-US-Standard-D',
+    'it-IT': 'it-IT-Standard-A',
+    'fr-FR': 'fr-FR-Standard-A',
+    'tr-TR': 'tr-TR-Standard-A',
+    'es-ES': 'es-ES-Standard-A'
+  };
+  return voiceMap[languageCode] || 'en-US-Standard-D';
 }
