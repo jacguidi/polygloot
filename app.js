@@ -79,31 +79,34 @@ async function startConversation() {
         speechEvents = hark(stream, options);
         
         let isRecording = false;
+        let recorder; // RecordRTC recorder
 
         speechEvents.on('speaking', function() {
             if (!isRecording) {
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
-                };
-                mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    await processAudio(audioBlob, language1, language2);
-                };
-                mediaRecorder.start();
-                audioChunks = [];
+                recorder = RecordRTC(stream, {
+                    type: 'audio',
+                    mimeType: 'audio/wav',
+                    recorderType: StereoAudioRecorder,
+                    desiredSampRate: 16000 // you can set the desired sample rate here
+                });
+                recorder.startRecording();
                 isRecording = true;
                 updateStatus('Speaking detected, recording started');
             }
         });
 
         speechEvents.on('stopped_speaking', function() {
-            if (isRecording && mediaRecorder) {
+            if (isRecording && recorder) {
                 setTimeout(() => {
-                    if (isRecording && mediaRecorder.state === 'recording') {
-                        mediaRecorder.stop();
-                        isRecording = false;
-                        updateStatus('Speech pause detected, processing audio');
+                    if (isRecording) {
+                        recorder.stopRecording(async function() {
+                            const audioBlob = recorder.getBlob();
+                            await processAudio(audioBlob, language1, language2);
+                            recorder.destroy();
+                            recorder = null;
+                            isRecording = false;
+                            updateStatus('Speech pause detected, processing audio');
+                        });
                     }
                 }, 1500);
             }
