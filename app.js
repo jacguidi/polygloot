@@ -3,18 +3,17 @@ let language1Select;
 let language2Select;
 let transcribedTextElement;
 let statusDiv;
+let mediaRecorder;
 let audioChunks = [];
 let speechEvents;
 let stream;
-let audioContext; // Added for AudioContext
-let recorder; // Added for RecordRTC recorder
 
 const languageToISO = {
     "English": "en",
     "Italian": "it",
     "French": "fr",
     "Turkish": "tr",
-    "Spanish": "es"
+    "Spanish": "es"  
 };
 
 const ISOToLanguage = {
@@ -22,7 +21,7 @@ const ISOToLanguage = {
     "it": "Italian",
     "fr": "French",
     "tr": "Turkish",
-    "es": "Spanish"
+    "es": "Spanish"  
 };
 
 const apiKey = ''; // We'll remove this later
@@ -66,16 +65,11 @@ async function startConversation() {
     }
 
     if (transcribedTextElement) {
-        transcribedTextElement.textContent = '';
+        transcribedTextElement.textContent = ''; 
     }
     const language1 = languageToISO[language1Select.options[language1Select.selectedIndex].text];
     const language2 = languageToISO[language2Select.options[language2Select.selectedIndex].text];
-
-    // Initialize AudioContext within user interaction
-    if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    }
-
+    
     try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const options = {
@@ -83,35 +77,33 @@ async function startConversation() {
             interval: 50
         };
         speechEvents = hark(stream, options);
-
+        
         let isRecording = false;
 
         speechEvents.on('speaking', function() {
             if (!isRecording) {
-                recorder = RecordRTC(stream, {
-                    type: 'audio',
-                    mimeType: 'audio/wav',
-                    recorderType: StereoAudioRecorder,
-                    desiredSampRate: 16000 // You can set the desired sample rate here
-                });
-                recorder.startRecording();
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    await processAudio(audioBlob, language1, language2);
+                };
+                mediaRecorder.start();
+                audioChunks = [];
                 isRecording = true;
                 updateStatus('Speaking detected, recording started');
             }
         });
 
         speechEvents.on('stopped_speaking', function() {
-            if (isRecording && recorder) {
+            if (isRecording && mediaRecorder) {
                 setTimeout(() => {
-                    if (isRecording) {
-                        recorder.stopRecording(async function() {
-                            const audioBlob = recorder.getBlob();
-                            await processAudio(audioBlob, language1, language2);
-                            recorder.destroy();
-                            recorder = null;
-                            isRecording = false;
-                            updateStatus('Speech pause detected, processing audio');
-                        });
+                    if (isRecording && mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                        isRecording = false;
+                        updateStatus('Speech pause detected, processing audio');
                     }
                 }, 1500);
             }
@@ -126,30 +118,27 @@ async function startConversation() {
 }
 
 function stopConversation() {
-    // Stop the recorder if it exists
-    if (recorder) {
-        recorder.stopRecording(function() {
-            recorder.destroy();
-            recorder = null;
-        });
+    // Stop the media recorder if it exists
+    if (mediaRecorder) {
+        mediaRecorder.stop();
     }
-
+    
     // Stop the speech events if they exist
     if (speechEvents) {
         speechEvents.stop();
     }
-
+    
     // Stop all tracks in the audio stream if it exists
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
     }
-
+    
     // Reset all variables
-    recorder = null;
+    mediaRecorder = null;
     speechEvents = null;
     stream = null;
     audioChunks = [];
-
+    
     // Update status and button
     updateStatus('Conversation stopped');
     startButton.textContent = 'Start Conversation';
@@ -180,7 +169,7 @@ async function transcribeAudio(audioBlob) {
         const data = await response.json();
         updateStatus(`Transcribed: ${data.text}`);
         document.getElementById('transcribedText').textContent = data.text;
-
+        
         return data.text;
     } catch (error) {
         console.error('Transcription error:', error);
@@ -229,7 +218,7 @@ async function processAudio(audioBlob, language1, language2) {
     try {
         // Transcribe the audio without assuming a specific language
         let transcribedText = await transcribeAudio(audioBlob);
-
+        
         // Immediately detect the language of the transcription
         let detectedLanguage = await detectLanguage(transcribedText);
 
@@ -310,7 +299,6 @@ async function translateText(text, sourceLanguage, targetLanguage) {
         throw error;
     }
 }
-
 async function generateSpeech(text, language) {
     try {
         const response = await fetch('/.netlify/functions/openai-api', {
@@ -339,35 +327,27 @@ async function generateSpeech(text, language) {
             throw new Error('No audio data received from the server');
         }
 
-        // Convert base64 to ArrayBuffer
-        const audioData = base64ToArrayBuffer(data.audio);
+        const audioBlob = base64ToBlob(data.audio, 'audio/mpeg');
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        await audio.play();
 
-        // Decode and play the audio data using AudioContext
-        audioContext.decodeAudioData(audioData, (buffer) => {
-            const source = audioContext.createBufferSource();
-            source.buffer = buffer;
-            source.connect(audioContext.destination);
-            source.start(0);
-            updateStatus(`Speech generated and playing`);
-        }, (error) => {
-            console.error('Audio decoding error:', error);
-            updateStatus('Audio decoding error');
-        });
+        updateStatus(`Speech generated and playing`);
     } catch (error) {
         console.error('Speech generation error:', error);
         updateStatus(`Speech generation error: ${error.message}`);
     }
 }
 
-// Helper function to convert base64 to ArrayBuffer
-function base64ToArrayBuffer(base64) {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+// Add this helper function to convert base64 to Blob
+function base64ToBlob(base64, mimeType) {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
     }
-    return bytes.buffer;
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
 }
 
 function updateStatus(message) {
