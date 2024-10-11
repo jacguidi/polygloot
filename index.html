@@ -259,12 +259,12 @@ footer {
             <div class="language-select">
                 <label for="language1">Language 1:</label>
                 <select id="language1">
-        <option>English</option>
-        <option>Italian</option>
-        <option>French</option>
-        <option>Turkish</option>
-        <option>Spanish</option>
-    </select>
+    <option>English</option>
+    <option>Italian</option>
+    <option>French</option>
+    <option>Turkish</option>
+    <option>Spanish</option>
+</select>
             </div>
             <button id="startButton">
                 <i class="fas fa-microphone"></i>
@@ -273,12 +273,12 @@ footer {
             <div class="language-select">
                 <label for="language2">Language 2:</label>
                 <select id="language2">
-        <option>English</option>
-        <option>Italian</option>
-        <option>French</option>
-        <option>Turkish</option>
-        <option>Spanish</option>
-    </select>
+    <option>English</option>
+    <option>Italian</option>
+    <option>French</option>
+    <option>Turkish</option>
+    <option>Spanish</option>
+</select>
             </div>
         </div>
         <div id="status" class="centered-text"></div>
@@ -289,40 +289,37 @@ footer {
 
     <!-- disclaimer popup -->
     <!-- disclaimer popup -->
-    <div id="disclaimerPopup" class="popup">
-        <div class="popup-content">
-            <h2>Welcome to Polygloot, your Personal Interpreter! 🌍🗣️</h2>
-            <p>Just talk, and we'll empower you to communicate across language barriers!</p>
-            <h3>Quick tips before you start:</h3>
-            <ul>
-                <li>Polygloot is clever, but not perfect, so expect the occasional mix-up! If it doesn't get it right, just repeat</li>
-                <li>Speak for at least 4-5 seconds - it helps the AI understand you better.</li>
-                <li>For important stuff like legal or medical talk, please use a professional interpreter, if available.</li>
-            </ul>
-            <p>By using this service, you agree to our <a href="privacy-policy.html" target="_blank">Privacy Policy</a>.</p>
-            <label>
-                <input type="checkbox" id="understandCheckbox">
-                I understand and I'm ready to chat in any language!
-            </label>
-            <div class="button-container">
-                <button id="acceptButton" disabled>Start Chatting</button>
-            </div>
+<div id="disclaimerPopup" class="popup">
+    <div class="popup-content">
+        <h2>Welcome to Polygloot, your Personal Interpreter! 🌍🗣️</h2>
+        <p>Just talk, and we'll empower you to communicate across language barriers!</p>
+        <h3>Quick tips before you start:</h3>
+        <ul>
+            <li>Polygloot is clever, but not perfect, so expect the occasional mix-up! If it doesn't get it right, just repeat</li>
+            <li>Speak for at least 4-5 seconds - it helps the AI understand you better.</li>
+            <li>For important stuff like legal or medical talk, please use a professional interpreter, if available.</li>
+        </ul>
+        <p>By using this service, you agree to our <a href="privacy-policy.html" target="_blank">Privacy Policy</a>.</p>
+        <label>
+            <input type="checkbox" id="understandCheckbox">
+            I understand and I'm ready to chat in any language!
+        </label>
+        <div class="button-container">
+            <button id="acceptButton" disabled>Start Chatting</button>
         </div>
     </div>
+</div>
 
-    <!-- Include necessary scripts -->
     <script src="https://cdn.jsdelivr.net/npm/hark@1.2.3/hark.bundle.min.js"></script>
-    <!-- Include RecordRTC Library -->
-    <script src="https://cdn.webrtc-experiment.com/RecordRTC.js"></script>
     <script src="app.js"></script>
 
     <footer>
     <p>&copy; 2024 Polygloot. <a href="privacy-policy.html">Privacy Policy</a></p>
     </footer>
     <!-- Minimal Cookie Consent Banner -->
-    <div id="cookie-banner" style="position: fixed; bottom: 0; width: 100%; background-color: #333; color: #fff; padding: 5px 10px; text-align: center; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); font-size: 12px; line-height: 1.5; height: 30px; display: flex; justify-content: space-between; align-items: center;">
-        <p style="margin: 0;">We use cookies to improve your experience. <a href="/privacy-policy" style="color: #ffd700; text-decoration: underline;">Learn more</a>.</p>
-        <button style="background-color: #764ba2; color: #fff; border: none; padding: 5px 10px; margin-left: 10px; cursor: pointer; border-radius: 3px; font-size: 12px; height: 20px; line-height: 1;" onclick="document.getElementById('cookie-banner').style.display='none';">OK</button>
-    </div>
+<div id="cookie-banner" style="position: fixed; bottom: 0; width: 100%; background-color: #333; color: #fff; padding: 5px 10px; text-align: center; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); font-size: 12px; line-height: 1.5; height: 30px; display: flex; justify-content: space-between; align-items: center;">
+    <p style="margin: 0;">We use cookies to improve your experience. <a href="/privacy-policy" style="color: #ffd700; text-decoration: underline;">Learn more</a>.</p>
+    <button style="background-color: #764ba2; color: #fff; border: none; padding: 5px 10px; margin-left: 10px; cursor: pointer; border-radius: 3px; font-size: 12px; height: 20px; line-height: 1;" onclick="document.getElementById('cookie-banner').style.display='none';">OK</button>
+</div>
 </body>
 </html>
